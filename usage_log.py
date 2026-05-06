@@ -83,10 +83,19 @@ def daily_summary(date_str: str | None = None) -> dict:
     return dict(totals)
 
 
-# free tier daily limits, used for the % bar in the CLI summary
+# free tier daily limits, used for the % bar in the CLI summary.
+# Day 13: model split means we now hit 4 different Groq endpoints. Numbers
+# below reflect Groq free tier as of May 2026; verify on the dashboard if
+# the % bar starts looking off.
 KNOWN_LIMITS = {
-    ("groq", "groq/llama-3.3-70b-versatile"): 100_000,
+    ("groq", "groq/openai/gpt-oss-120b"): 200_000,
+    ("groq", "openai/gpt-oss-120b"): 200_000,  # planner logs without prefix
+    ("groq", "groq/meta-llama/llama-4-scout-17b-16e-instruct"): 500_000,
+    ("groq", "groq/qwen/qwen3-32b"): 500_000,
     ("groq", "groq/llama-3.1-8b-instant"): 500_000,
+    ("groq", "llama-3.1-8b-instant"): 500_000,  # subquery logs without prefix
+    # legacy keys kept so historical entries still render with a bar
+    ("groq", "groq/llama-3.3-70b-versatile"): 100_000,
     # gemini free tier is 1500 req/day, no documented TPD; show usage only
 }
 

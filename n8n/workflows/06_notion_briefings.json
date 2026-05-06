@@ -1,0 +1,171 @@
+{
+  "name": "AMIA Workflow 6 - Notion Briefings",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "5 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "cron-1",
+      "name": "Cron 8:05am Sydney",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "notes": "Fires 5 minutes after the email so the Flask server isn't double-pinged."
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:8000/deliver",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "http-1",
+      "name": "GET /deliver",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "notes": "Returns {date, count, briefings: [...]}. We split the array next."
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "briefings",
+        "options": {}
+      },
+      "id": "split-1",
+      "name": "Split per ticker",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [680, 300],
+      "notes": "Turns the briefings array into one n8n item per ticker so the Notion node fires 5 times."
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": "REPLACE_WITH_NOTION_DATABASE_ID",
+        "title": "={{ $json.ticker }} - {{ $('GET /deliver').item.json.date }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Ticker|select",
+              "selectValue": "={{ $json.ticker }}"
+            },
+            {
+              "key": "Date|date",
+              "date": "={{ $('GET /deliver').item.json.date }}"
+            },
+            {
+              "key": "Preview|rich_text",
+              "textContent": "={{ $json.preview }}"
+            }
+          ]
+        },
+        "blockUi": {
+          "blockValues": [
+            {
+              "type": "heading_2",
+              "richText": false,
+              "textContent": "Summary"
+            },
+            {
+              "type": "paragraph",
+              "richText": false,
+              "textContent": "={{ $json.summary }}"
+            },
+            {
+              "type": "heading_2",
+              "richText": false,
+              "textContent": "Key Signals"
+            },
+            {
+              "type": "paragraph",
+              "richText": false,
+              "textContent": "={{ $json.key_signals }}"
+            },
+            {
+              "type": "heading_2",
+              "richText": false,
+              "textContent": "Watch"
+            },
+            {
+              "type": "paragraph",
+              "richText": false,
+              "textContent": "={{ $json.watch }}"
+            },
+            {
+              "type": "heading_2",
+              "richText": false,
+              "textContent": "Sources"
+            },
+            {
+              "type": "paragraph",
+              "richText": false,
+              "textContent": "={{ $json.sources }}"
+            }
+          ]
+        }
+      },
+      "id": "notion-1",
+      "name": "Create Notion page",
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [900, 300],
+      "credentials": {
+        "notionApi": {
+          "id": "REPLACE_WITH_NOTION_CREDENTIAL_ID",
+          "name": "Notion AMIA"
+        }
+      },
+      "notes": "After importing, open this node and re-pick the database from the dropdown so n8n re-resolves the property keys."
+    }
+  ],
+  "connections": {
+    "Cron 8:05am Sydney": {
+      "main": [
+        [
+          {
+            "node": "GET /deliver",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET /deliver": {
+      "main": [
+        [
+          {
+            "node": "Split per ticker",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split per ticker": {
+      "main": [
+        [
+          {
+            "node": "Create Notion page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "amia"
+    }
+  ]
+}

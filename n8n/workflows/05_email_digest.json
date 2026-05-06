@@ -1,0 +1,131 @@
+{
+  "name": "AMIA Workflow 5 - Email Digest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "id": "cron-1",
+      "name": "Cron 8am Sydney",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [240, 300],
+      "notes": "Runs daily at 8am. Set n8n GENERIC_TIMEZONE=Australia/Sydney in env."
+    },
+    {
+      "parameters": {
+        "url": "http://host.docker.internal:8000/deliver-html",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "http-1",
+      "name": "GET /deliver-html",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [460, 300],
+      "notes": "Hits the Flask server on the host. Returns {subject, html, date, count}."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-1",
+      "name": "Has briefings?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [680, 300],
+      "notes": "Skip the email if no briefings were generated today (e.g. pipeline crashed)."
+    },
+    {
+      "parameters": {
+        "fromEmail": "wong.kittituch@gmail.com",
+        "toEmail": "wong.kittituch@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "html",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "id": "email-1",
+      "name": "Send Gmail",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [900, 240],
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_WITH_SMTP_CREDENTIAL_ID",
+          "name": "Gmail SMTP"
+        }
+      },
+      "notes": "Uses the Gmail SMTP credential you'll create in n8n with your App Password."
+    }
+  ],
+  "connections": {
+    "Cron 8am Sydney": {
+      "main": [
+        [
+          {
+            "node": "GET /deliver-html",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GET /deliver-html": {
+      "main": [
+        [
+          {
+            "node": "Has briefings?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has briefings?": {
+      "main": [
+        [
+          {
+            "node": "Send Gmail",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [
+    {
+      "name": "amia"
+    }
+  ]
+}

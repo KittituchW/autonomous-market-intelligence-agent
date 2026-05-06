@@ -13,6 +13,15 @@ from dotenv import load_dotenv
 from crewai import Agent, Task, Crew, Process, LLM
 from subquery import compare_news_and_social
 from usage_log import litellm_callback as _usage_callback
+from models import (
+    RESEARCHER_MODEL,
+    ANALYST_MODEL,
+    CRITIC_MODEL,
+    WRITER_MODEL,
+    WRITER_FALLBACK_MODEL,
+    OLLAMA_BASE_URL,
+    GEMINI_FALLBACK_MODEL,
+)
 
 load_dotenv()
 
@@ -30,44 +39,118 @@ litellm.success_callback.append(_usage_callback)
 # --- Day 12: rate-limit reliability ---
 # When Groq hits TPD (100k/day on free tier) or TPM (6k/min), automatically
 # fall back to Gemini. LiteLLM checks these globals on every completion call.
-# We use the same Gemini model the critic already uses, so we know it works.
-GROQ_FALLBACK_MODEL = "gemini/gemini-3.1-flash-lite-preview"
+# Day 13: fallback list now covers the NEW per-agent model ids.
 litellm.num_retries = 2  # transient errors get a free retry first
 litellm.fallbacks = [
-    {"groq/llama-3.3-70b-versatile": [GROQ_FALLBACK_MODEL]},
-    {"groq/llama-3.1-8b-instant": [GROQ_FALLBACK_MODEL]},
+    {RESEARCHER_MODEL: [GEMINI_FALLBACK_MODEL]},
+    {ANALYST_MODEL: [GEMINI_FALLBACK_MODEL]},
+    # Writer runtime fallback. If gemma3:4b times out or OOMs mid-generation
+    # (8GB RAM is tight when Chrome + Cursor + Qdrant are also resident),
+    # LiteLLM transparently retries on Gemini 3.1 Flash Lite.
+    {WRITER_MODEL: [WRITER_FALLBACK_MODEL]},
 ]
 
-# Groq for the heavy reasoning agents (researcher, analyst).
+# --- Day 13: per-agent model split ---
+# Previously researcher + analyst shared one Llama 3.3 70B instance. We split
+# them so each agent gets the model that fits its job:
+#   - Researcher reads many docs and extracts cited facts -> Llama 4 Scout
+#     (long context + high throughput on Groq)
+#   - Analyst does numerical reasoning over the findings -> Qwen3-32B
+#     (consistently strongest open model on math at this size)
 # Needs GROQ_API_KEY env var set, which load_dotenv handles above.
-groq_llm = LLM(
-    model="groq/llama-3.3-70b-versatile",
+def _force_text_tool_mode(llm: LLM) -> LLM:
+    """Use CrewAI's text tool loop instead of provider-native tool calls.
+
+    Groq can reject optional native tool calls with tool_use_failed when the
+    model chooses to answer directly. CrewAI's ReAct loop allows the same agent
+    tool while keeping the first response as plain text when no tool is needed.
+    """
+    object.__setattr__(llm, "supports_function_calling", lambda: False)
+    return llm
+
+
+researcher_llm = _force_text_tool_mode(
+    LLM(
+        model=RESEARCHER_MODEL,
+        temperature=0,
+        api_key=os.getenv("GROQ_API_KEY"),
+    )
+)
+
+analyst_llm = LLM(
+    model=ANALYST_MODEL,
     temperature=0,
     api_key=os.getenv("GROQ_API_KEY"),
 )
 
-# Critic uses a smaller / different model for diversity so it does not
-# anchor on the analyst. Gemini free tier was returning "limit: 0" so we
-# fall back to Groq's smaller llama 8B instant. To go back to Gemini once
-# the key is sorted, swap this block for the gemini LLM commented below.
-# critic_llm = LLM(
-#     model="groq/llama-3.1-8b-instant",
-#     temperature=0,
-#     api_key=os.getenv("GROQ_API_KEY"),
-# )
+# Critic uses a different vendor (Gemini) for diversity so it does not anchor
+# on the analyst. Top wants this kept on Gemini 3.1 Flash Lite Preview.
 os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "")
-critic_llm = LLM(model="gemini/gemini-3.1-flash-lite-preview", temperature=0)
+critic_llm = LLM(model=CRITIC_MODEL, temperature=0)
 
-# Local writer via Ollama. base_url points to the local Ollama server.
-# Only loads when this agent runs, keeps RAM pressure low.
-ollama_llm = LLM(
-    model="ollama/gemma3:1b",
-    base_url="http://localhost:11434",
-    temperature=0.3,
-)
-# ollama_llm = LLM(
-# model="gemini/gemini-3-flash-preview", temperature=0.3, api_key=os.getenv("GEMINI_API_KEY")
-# )
+# --- Local writer with cloud fallback ---
+# Day 13: writer runs on local Gemma 3 4B by default. On 8GB RAM the 4B model
+# is borderline -- if Chrome/Cursor/Qdrant are also resident it can OOM or
+# time out. Three escape hatches, in order of cost:
+#   1. AMIA_WRITER=cloud env var -> skip Ollama entirely, use Gemini
+#   2. Pre-flight check at module load -> if Ollama is down or gemma3:4b
+#      is not pulled, swap to Gemini before the crew is built
+#   3. LiteLLM fallback (above) -> if the writer crashes mid-run, the next
+#      call retries on Gemini transparently
+def _pick_writer_llm():
+    """Choose the writer LLM. Local Gemma if reachable, else Gemini."""
+    forced = os.getenv("AMIA_WRITER", "").strip().lower()
+    if forced == "cloud":
+        print("[writer] AMIA_WRITER=cloud, using Gemini fallback")
+        return LLM(
+            model=WRITER_FALLBACK_MODEL,
+            temperature=0.3,
+            api_key=os.getenv("GEMINI_API_KEY"),
+        )
+    if forced == "local":
+        # explicit local: skip the reachability probe
+        return LLM(
+            model=WRITER_MODEL,
+            base_url=OLLAMA_BASE_URL,
+            temperature=0.3,
+        )
+
+    # Default: probe Ollama. 3-second timeout is enough -- if Ollama is up,
+    # /api/tags responds in <100ms.
+    try:
+        import urllib.request
+        import json as _json
+        with urllib.request.urlopen(
+            f"{OLLAMA_BASE_URL}/api/tags", timeout=3
+        ) as resp:
+            tags = _json.loads(resp.read())
+        loaded = {m["name"] for m in tags.get("models", [])}
+        wanted = WRITER_MODEL.split("/", 1)[-1]  # "gemma3:4b"
+        if wanted not in loaded:
+            print(
+                f"[writer] {wanted} not pulled in Ollama "
+                f"(found {sorted(loaded)}), falling back to Gemini"
+            )
+            return LLM(
+                model=WRITER_FALLBACK_MODEL,
+                temperature=0.3,
+                api_key=os.getenv("GEMINI_API_KEY"),
+            )
+        return LLM(
+            model=WRITER_MODEL,
+            base_url=OLLAMA_BASE_URL,
+            temperature=0.3,
+        )
+    except Exception as e:
+        print(f"[writer] Ollama unreachable ({e}), falling back to Gemini")
+        return LLM(
+            model=WRITER_FALLBACK_MODEL,
+            temperature=0.3,
+            api_key=os.getenv("GEMINI_API_KEY"),
+        )
+
+
+ollama_llm = _pick_writer_llm()
 
 
 def _format_sources_block(sources: list[dict]) -> str:
@@ -99,11 +182,11 @@ def build_crew(ticker: str, context: str, sources: list[dict], verbose: bool = T
         backstory=(
             "You are a senior buyside researcher. You skim noise fast and only "
             "flag developments that move price or change narrative. You always "
-            "cite sources by their [id] number. When a signal seems to depend "
-            "on news vs retail sentiment divergence, call the "
-            "compare_news_and_social tool."
+            "cite sources by their [id] number. Usually answer from the supplied "
+            "context. Only call compare_news_and_social when the supplied context "
+            "does not clearly show the news vs retail sentiment divergence."
         ),
-        llm=groq_llm,
+        llm=researcher_llm,
         tools=[compare_news_and_social],  # Day 5 sub-question engine wrapped as tool
         allow_delegation=False,
         verbose=verbose,
@@ -118,7 +201,7 @@ def build_crew(ticker: str, context: str, sources: list[dict], verbose: bool = T
             "(what could push it down). You weigh retail sentiment from "
             "StockTwits as a signal but never as the main driver. You cite [id]."
         ),
-        llm=groq_llm,
+        llm=analyst_llm,
         allow_delegation=False,
         verbose=verbose,
     )
@@ -212,7 +295,7 @@ def build_crew(ticker: str, context: str, sources: list[dict], verbose: bool = T
         process=Process.sequential,  # one task at a time, output flows forward
         verbose=verbose,
         tracing=True,  # skip the interactive y/N trace prompt at end of run
-        manager_llm=groq_llm,  # silences the "LLM is explicitly disabled. Using MockLLM" warning
+        manager_llm=analyst_llm,  # silences the "LLM is explicitly disabled. Using MockLLM" warning
     )
 
 

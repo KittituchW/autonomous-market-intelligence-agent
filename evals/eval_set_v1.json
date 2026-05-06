@@ -1,0 +1,82 @@
+[
+{
+"id": "q1",
+"question": "What is the main recent news affecting AAPL, and why does it matter for investors?",
+"category": "news_only",
+"expected_sources": ["news"],
+"expected_keywords": ["iphone", "revenue", "guidance", "china"],
+"expected_conclusion": "A correct answer should summarize the key AAPL news event and explain its likely impact on revenue, demand, or investor expectations."
+},
+{
+"id": "q2",
+"question": "What recent development is driving TSLA coverage in financial news?",
+"category": "news_only",
+"expected_sources": ["news"],
+"expected_keywords": ["deliveries", "margin", "price cuts", "ev"],
+"expected_conclusion": "A correct answer should identify the main TSLA news catalyst and connect it to vehicle demand, pricing pressure, or profitability."
+},
+{
+"id": "q3",
+"question": "What does recent news suggest about NVDA’s AI data center business?",
+"category": "news_only",
+"expected_sources": ["news"],
+"expected_keywords": ["ai", "data center", "chips", "demand"],
+"expected_conclusion": "A correct answer should explain whether NVDA’s recent news points to strength or weakness in AI chip and data center demand."
+},
+{
+"id": "q4",
+"question": "What is the most important recent MSFT news for its cloud and AI strategy?",
+"category": "news_only",
+"expected_sources": ["news"],
+"expected_keywords": ["azure", "ai", "cloud", "copilot"],
+"expected_conclusion": "A correct answer should describe the relevant MSFT news and explain how it affects Azure, AI products, or enterprise growth."
+},
+{
+"id": "q5",
+"question": "What recent news is most relevant to AMZN’s retail or cloud business outlook?",
+"category": "news_only",
+"expected_sources": ["news"],
+"expected_keywords": ["aws", "retail", "margin", "growth"],
+"expected_conclusion": "A correct answer should summarize the key AMZN news and explain whether it matters more for AWS, retail performance, or profitability."
+},
+{
+"id": "q6",
+"question": "For AAPL, does retail trader sentiment on StockTwits agree with the recent financial news narrative?",
+"category": "cross_source",
+"expected_sources": ["news", "stocktwits"],
+"expected_keywords": ["bullish", "bearish", "iphone", "sentiment"],
+"expected_conclusion": "A correct answer should compare AAPL news coverage with StockTwits sentiment and state whether retail traders are aligned with or pushing against the news narrative."
+},
+{
+"id": "q7",
+"question": "For NVDA, is the discussion on HackerNews more skeptical or supportive than recent financial news coverage?",
+"category": "cross_source",
+"expected_sources": ["news", "hackernews"],
+"expected_keywords": ["ai", "gpu", "valuation", "skepticism"],
+"expected_conclusion": "A correct answer should contrast financial news about NVDA with HackerNews discussion, especially around AI demand, technical strength, and valuation concerns."
+},
+{
+"id": "q8",
+"question": "For TSLA, are retail traders reacting more strongly to recent news than the news itself suggests?",
+"category": "cross_source",
+"expected_sources": ["news", "stocktwits"],
+"expected_keywords": ["deliveries", "bullish", "bearish", "volatility"],
+"expected_conclusion": "A correct answer should explain whether StockTwits sentiment around TSLA appears more optimistic or pessimistic than the recent news catalyst alone would imply."
+},
+{
+"id": "q9",
+"question": "For MSFT, has the story around AI shifted when comparing financial news with HackerNews discussion?",
+"category": "cross_source",
+"expected_sources": ["news", "hackernews"],
+"expected_keywords": ["copilot", "azure", "ai", "adoption"],
+"expected_conclusion": "A correct answer should identify whether MSFT’s AI narrative is viewed as growth driven in news but questioned or reframed in HackerNews discussion."
+},
+{
+"id": "q10",
+"question": "For AMZN, do recent news, retail sentiment, and tech discussion tell the same story about the company’s outlook?",
+"category": "cross_source",
+"expected_sources": ["news", "stocktwits", "hackernews"],
+"expected_keywords": ["aws", "margin", "bullish", "automation"],
+"expected_conclusion": "A correct answer should combine AMZN news, StockTwits sentiment, and HackerNews discussion to judge whether the overall outlook is consistent or mixed across sources."
+}
+]

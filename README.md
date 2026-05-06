@@ -18,33 +18,7 @@ The "write" node is a 4-agent CrewAI crew: researcher, analyst, critic, writer. 
 
 ## Architecture
 
-```mermaid
-graph TD
-    subgraph "n8n daily schedule"
-        N1[NewsAPI pull] --> RX
-        N2[StockTwits pull] --> RX
-        N3[HackerNews pull] --> RX
-        RX[Qdrant re-index] --> TR[Trigger pipeline]
-    end
-
-    TR --> LG
-
-    subgraph "LangGraph state machine"
-        LG[plan node<br/>Groq 70B] --> RT[retrieve node<br/>LlamaIndex over Qdrant]
-        RT --> WR[write node]
-    end
-
-    subgraph "CrewAI 4-agent crew"
-        WR --> R1[Researcher<br/>Groq 70B]
-        R1 --> R2[Analyst<br/>Groq 70B]
-        R2 --> R3[Critic<br/>Gemini Flash]
-        R3 --> R4[Writer<br/>local Gemma 3 1B]
-    end
-
-    R4 --> OUT[briefings/YYYY-MM-DD/*.md]
-    OUT --> EMAIL[Email]
-    OUT --> NOTION[Notion DB]
-```
+![AMIA architecture: n8n daily schedule feeds a LangGraph state machine which hands off to a 4-agent CrewAI crew, outputs land in dated markdown briefings then fan out to Email and Notion](assets/architecture.png)
 
 Why so many frameworks? Each one earned a specific job:
 
@@ -56,15 +30,18 @@ Why so many frameworks? Each one earned a specific job:
 
 ## Model split
 
+Day 13 update: every node now runs on the model that fits its job, not the same 70B everywhere. All non-Gemini, non-Gemma models run on Groq.
+
 | Agent | Model | Why |
 |---|---|---|
-| Planner | Groq Llama 3.3 70B | Fast, cheap, free 100k TPD. Good at "what should I research about X" questions. |
-| Researcher | Groq Llama 3.3 70B | Reads ~5k tokens of context, picks 3 signals. 70B handles the abstraction. |
-| Analyst | Groq Llama 3.3 70B | Catalyst/risk reasoning over researcher's findings. |
-| Critic | Gemini 2.0 Flash | Different vendor on purpose. Stops the analyst-anchoring problem where the same model agrees with itself. |
-| Writer | Local Gemma 3 1B via Ollama | The portfolio reason — touch a local LLM end-to-end. The post-processing layer compensates for its weaknesses. |
+| Planner | GPT-OSS 120B | Strongest reasoning on Groq for query decomposition. Plan errors cascade through the whole pipeline, so this is where a bigger model pays off. |
+| Sub-question engine | Llama 3.1 8B Instant | Called as a tool by the Researcher for cross-source decomposition. Latency matters more than depth here. |
+| Researcher | Llama 4 Scout 17B | Long context + high throughput for reading many news/social docs at once. Best fit for "extract the 3 material signals" work. |
+| Analyst | Qwen3-32B | Strongest open model at this size on numerical / quantitative reasoning, which is what catalyst-and-risk thinking needs. |
+| Critic | Gemini 3.1 Flash Lite | Different vendor on purpose. Stops the analyst-anchoring problem where the same model family agrees with itself. |
+| Writer | Local Gemma 3 4B via Ollama | The portfolio reason — touch a local LLM end-to-end. Bumped from 1B because the smaller model was producing stiff prose and hallucinating Sources URLs. |
 
-When Groq's TPD hits 100k, every Groq call (planner + researcher + analyst) auto-falls-back to Gemini Flash via `litellm.fallbacks`. The eval below was partly served by Gemini after Groq capped, and the score didn't move.
+When Groq rate limits, every Groq call auto-falls-back to Gemini 3.1 Flash Lite via `litellm.fallbacks`. The eval below was partly served by Gemini after Groq capped, and the score didn't move.
 
 ## How news and social signals are weighted
 
@@ -104,9 +81,12 @@ The takeaway is structural fixes outscore prompt tuning. Three of the four jumps
 |---|---|---|
 | Embeddings | nomic-embed-text via Ollama | local, $0 |
 | Vector store | Qdrant (Docker) | local, $0 |
-| Heavy reasoning | Groq Llama 3.3 70B | 100k TPD free |
-| Diversity model | Gemini 2.0 Flash | 1500 RPD free |
-| Local writer | Gemma 3 1B via Ollama | local, $0 |
+| Planner | Groq GPT-OSS 120B | free tier |
+| Researcher | Groq Llama 4 Scout 17B | free tier |
+| Analyst | Groq Qwen3-32B | free tier |
+| Sub-question | Groq Llama 3.1 8B Instant | free tier |
+| Diversity / fallback model | Gemini 3.1 Flash Lite | 1500 RPD free |
+| Local writer | Gemma 3 4B via Ollama | local, $0 |
 | Tracing | self-hosted Langfuse | local, $0 |
 | Orchestration | n8n via npm | local, $0 |
 | News | NewsAPI | 100 RPD free |
@@ -123,7 +103,7 @@ pip install -r requirements.txt
 
 # pull local models
 ollama pull nomic-embed-text
-ollama pull gemma3:1b
+ollama pull gemma3:4b
 
 # start qdrant
 docker run -d -p 6333:6333 qdrant/qdrant
@@ -148,9 +128,10 @@ python run_briefings.py
 A few things make this survive an unattended daily run:
 
 1. **Groq → Gemini fallback** via `litellm.fallbacks` for the crew, plus a try/except wrapper in the planner. Eval above was partly served by Gemini after Groq capped.
-2. **6-hour disk cache** on `retrieve_with_sources` keyed by `(query, ticker, top_k)`. Skips the Ollama embed and Qdrant query on hits.
-3. **NewsAPI pre-flight counter** in `ingest.py` bails before the call when the day's 100 are spent. Counter resets at UTC midnight.
-4. **Per-provider token usage log** at `logs/token_usage.jsonl`. `python usage_log.py` prints daily totals against known free-tier limits.
+2. **Writer → Gemini fallback** with three layers: a pre-flight probe of `localhost:11434/api/tags` at module load, a LiteLLM runtime fallback for mid-generation OOM/timeout, and an `AMIA_WRITER=cloud` env var to force cloud mode when you know RAM will be tight. Pipeline still produces a briefing if Ollama is offline or `gemma3:4b` is too heavy that day.
+3. **6-hour disk cache** on `retrieve_with_sources` keyed by `(query, ticker, top_k)`. Skips the Ollama embed and Qdrant query on hits.
+4. **NewsAPI pre-flight counter** in `ingest.py` bails before the call when the day's 100 are spent. Counter resets at UTC midnight.
+5. **Per-provider token usage log** at `logs/token_usage.jsonl`. `python usage_log.py` prints daily totals against known free-tier limits.
 
 ## Project structure
 
@@ -178,7 +159,7 @@ n8n/                 # workflow exports
 
 ## Constraints worth naming
 
-8GB RAM is the real constraint. Ollama, Qdrant Docker, n8n, Chrome, and Cursor cannot all run simultaneously. The compromise is: Qdrant via Docker, Ollama only loads when the writer agent fires, n8n via npm not Docker. Gemma 3 4B was too heavy at the writer node — dropped to 1B and added URL post-processing to compensate.
+8GB RAM is the real constraint. Ollama, Qdrant Docker, n8n, Chrome, and Cursor cannot all run simultaneously. The compromise is: Qdrant via Docker, Ollama only loads when the writer agent fires, n8n via npm not Docker. Originally ran the writer on Gemma 3 1B but it kept producing stiff prose and hallucinating URLs; bumped to Gemma 3 4B which fits comfortably as long as nothing else is touching VRAM during the writer step. URL post-processing in the LangGraph write node is still in place as a belt-and-braces fix.
 
 No paid APIs. No Reddit either — Reddit's API approval is unreliable, X is paid, so social signal comes from StockTwits and HackerNews only.
 

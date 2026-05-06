@@ -18,12 +18,16 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from retrieval import search_news, retrieve_with_sources
 from crew import build_crew
 from usage_log import log as _usage_log
+from models import PLANNER_MODEL_BARE, GEMINI_MODEL_BARE
 
 load_dotenv()
 
 # planner uses Groq directly. The crew handles its own LLMs in the write node.
+# Day 13: switched from llama-3.3-70b-versatile to gpt-oss-120b. Planning is
+# the choke point of the pipeline; weak decomposition cascades into bad
+# retrieval queries, so we pay for the bigger reasoning model here.
 llm = ChatGroq(
-    model="llama-3.3-70b-versatile",
+    model=PLANNER_MODEL_BARE,
     temperature=0,
     api_key=os.getenv("GROQ_API_KEY"),
 )
@@ -32,7 +36,7 @@ llm = ChatGroq(
 # but litellm-style errors leak through too, so we match on the message.
 # Same Gemini model the crew critic uses.
 fallback_llm = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
+    model=GEMINI_MODEL_BARE,
     temperature=0,
     google_api_key=os.getenv("GEMINI_API_KEY"),
 )
@@ -53,7 +57,7 @@ def _invoke_with_fallback(prompt: str) -> str:
         usage = resp.response_metadata.get("token_usage", {}) or {}
         _usage_log(
             provider="groq",
-            model="llama-3.3-70b-versatile",
+            model=PLANNER_MODEL_BARE,
             prompt_tokens=usage.get("prompt_tokens", 0),
             completion_tokens=usage.get("completion_tokens", 0),
             source="planner",
@@ -75,7 +79,7 @@ def _invoke_with_fallback(prompt: str) -> str:
         usage = (resp.response_metadata or {}).get("usage_metadata", {}) or {}
         _usage_log(
             provider="gemini",
-            model="gemini-2.0-flash",
+            model=GEMINI_MODEL_BARE,
             prompt_tokens=usage.get("input_tokens", 0),
             completion_tokens=usage.get("output_tokens", 0),
             source="planner-fallback",
