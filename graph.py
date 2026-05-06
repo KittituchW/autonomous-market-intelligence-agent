@@ -17,6 +17,7 @@ from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
 from retrieval import search_news, retrieve_with_sources
 from crew import build_crew
+from usage_log import log as _usage_log
 
 load_dotenv()
 
@@ -43,9 +44,21 @@ def _invoke_with_fallback(prompt: str) -> str:
     The crew has its own fallback wired via litellm globals in crew.py.
     This function only covers the plan_node call which goes through
     langchain_groq, not litellm.
+
+    Day 12 task 4: every call (success OR fallback) is logged to
+    logs/token_usage.jsonl so `python usage_log.py` can show daily totals.
     """
     try:
-        return llm.invoke(prompt).content
+        resp = llm.invoke(prompt)
+        usage = resp.response_metadata.get("token_usage", {}) or {}
+        _usage_log(
+            provider="groq",
+            model="llama-3.3-70b-versatile",
+            prompt_tokens=usage.get("prompt_tokens", 0),
+            completion_tokens=usage.get("completion_tokens", 0),
+            source="planner",
+        )
+        return resp.content
     except Exception as e:
         msg = str(e).lower()
         is_rate_limit = (
@@ -58,7 +71,16 @@ def _invoke_with_fallback(prompt: str) -> str:
         if not is_rate_limit:
             raise
         print("[plan] Groq rate limited, falling back to Gemini")
-        return fallback_llm.invoke(prompt).content
+        resp = fallback_llm.invoke(prompt)
+        usage = (resp.response_metadata or {}).get("usage_metadata", {}) or {}
+        _usage_log(
+            provider="gemini",
+            model="gemini-2.0-flash",
+            prompt_tokens=usage.get("input_tokens", 0),
+            completion_tokens=usage.get("output_tokens", 0),
+            source="planner-fallback",
+        )
+        return resp.content
 
 
 class State(TypedDict):

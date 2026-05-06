@@ -1,0 +1,35 @@
+# env + secrets
+.env
+.env.local
+
+# python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# project artifacts
+qdrant_storage/
+data/news/
+data/social/
+briefings/
+cache/
+logs/
+
+# do keep eval results so the README's table is reproducible
+!evals/results_*.json
+!evals/eval_set_v1.json
+
+# notes
+notes/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# editors
+.vscode/
+.idea/
+*.swp

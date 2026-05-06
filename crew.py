@@ -12,8 +12,16 @@ import litellm
 from dotenv import load_dotenv
 from crewai import Agent, Task, Crew, Process, LLM
 from subquery import compare_news_and_social
+from usage_log import litellm_callback as _usage_callback
 
 load_dotenv()
+
+# Day 12 task 4: every successful crew agent call lands in logs/token_usage.jsonl
+# litellm.success_callback is a list of either string names or callables.
+# Append our callable so it runs alongside any existing callbacks.
+if not isinstance(litellm.success_callback, list):
+    litellm.success_callback = []
+litellm.success_callback.append(_usage_callback)
 
 # CrewAI 0.51 wants its own LLM wrapper (LiteLLM under the hood),
 # not langchain_groq / langchain_google_genai / langchain_ollama objects directly.

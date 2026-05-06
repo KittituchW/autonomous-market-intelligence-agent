@@ -1,0 +1,250 @@
+{
+  "run_at": "2026-05-03T20:55:59.438442",
+  "total_questions": 10,
+  "retrieval_pass_rate": 0.9,
+  "reasoning_avg": 0.4,
+  "news_only": {
+    "n": 5,
+    "retrieval_pass_rate": 1.0,
+    "reasoning_avg": 0.55
+  },
+  "cross_source": {
+    "n": 5,
+    "retrieval_pass_rate": 0.8,
+    "reasoning_avg": 0.25
+  },
+  "results": [
+    {
+      "id": "q1",
+      "category": "news_only",
+      "ticker_used": "AAPL",
+      "expected_sources": [
+        "news"
+      ],
+      "found_source_categories": [
+        "hackernews",
+        "news",
+        "stocktwits"
+      ],
+      "retrieval_pass": true,
+      "reasoning_score": 0.75,
+      "expected_keywords": [
+        "iphone",
+        "revenue",
+        "guidance",
+        "china"
+      ],
+      "briefing": "**Summary:**\n\nApple (AAPL) is currently experiencing a positive outlook following Morgan Stanley\u2019s increased price target, driven by strong iPhone revenue and a significant increase in iPhone sales. However, the analyst\u2019s assessment lacks sufficient detail regarding potential risks, particularly concerning the supply chain and the continued sustainability of iPhone sales in key markets like China.  The increased price target represents a significant signal, potentially influencing investor sentiment, while the chip shortages and potential for market saturation present risks to revenue growth.\n\n**Key Signals:**\n\n*   **News:** Morgan Stanley increased Apple\u2019s price target from $315 to $330, signaling confidence in Apple\u2019s performance and potential for future growth.\n*   **Retail Sentiment:**  Positive sentiment towards Apple\u2019s iPhone sales, indicated by the increased price target.\n*   **Risks:** Potential disruptions to Apple\u2019s supply chain, impacting demand and revenue, and the risk of sustained iPhone sales decline in China.\n\n**Watch:**  Monitor Apple\u2019s iPhone sales figures and the ongoing status of the chip shortage, as these will be key indicators of future revenue and profitability.\n\n**Sources:**\n1. [AAPL/stocktwits] [bullish] https://stocktwits.com/message/652111258\n2. [AAPL/stocktwits] [bullish] https://stocktwits.com/message/652114123\n3. [AAPL/stocktwits] [neutral] https://stocktwits.com/message/652108880\n4. [AAPL/Barchart.com] https://www.barchart.com/story/news/1538016/apple-stock-analyst-estimates-ratings\n5. [AAPL/stocktwits] [neutral] https://stocktwits.com/message/652111324\n6. [AAPL/stocktwits] [neutral] https://stocktwits.com/message/652111289\n7. [AAPL/stocktwits] [neutral] https://stocktwits.com/message/652113642\n8. [AAPL/Barchart.com] https://www.barchart.com/story/news/1621672/stocks-see-support-from-lower-crude-prices-while-mega-cap-tech-earnings-are-mixed\n9. [AAPL/hackernews] https://www.theverge.com/tech/921527/apple-iphone-revenue-q2-2026-earnings\n10. [AAPL/hackernews] https://finance.yahoo.com/video/apple-beats-on-q2-earnings-thanks-to-china--iphone-sales-204052273.html",
+      "error": null
+    },
+    {
+      "id": "q2",
+      "category": "news_only",
+      "ticker_used": "TSLA",
+      "expected_sources": [
+        "news"
+      ],
+      "found_source_categories": [
+        "hackernews",
+        "news",
+        "stocktwits"
+      ],
+      "retrieval_pass": true,
+      "reasoning_score": 0.25,
+      "expected_keywords": [
+        "deliveries",
+        "margin",
+        "price cuts",
+        "ev"
+      ],
+      "briefing": "**Summary:**\n\nElon Musk\u2019s potential acquisition of Spirit Airlines could significantly impact TSLA\u2019s stock, potentially driving up the price due to the projected expansion of the airline business. However, the success of the Cybercab production launch, while a positive milestone, carries risks due to the mixed results from Tesla\u2019s Q1 2026 earnings report and the ongoing legal battle with OpenAI. Investor sentiment remains highly sensitive to innovation themes, with volatility expected to increase.\n\n**Key Signals:**\n\n*   **News:** Potential acquisition of Spirit Airlines, mixed Q1 2026 earnings, Cybercab production milestone.\n*   **Retail sentiment:** High sensitivity to innovation themes, market volatility expected.\n*   **Risks:** Mixed Q1 2026 earnings, legal battle with OpenAI, potential decline in investor confidence.\n\n**Watch:**\n\n*   Monitor Spirit Airlines\u2019 performance and potential integration into TSLA\u2019s strategy.\n*   Track the progress of the Cybercab production and its impact on revenue and market position.\n*   Analyze the implications of the legal battle with OpenAI and its potential effect on TSLA\u2019s stock.\n\n**Sources:**\n1. [TSLA/stocktwits] [neutral] https://stocktwits.com/message/652108218\n2. [TSLA/Barchart.com] https://www.barchart.com/story/news/1563347/as-the-number-of-iot-devices-starts-to-surge-verizon-no-longer-relies-on-traditional-subscriber-growth-vz-stock-is-part-of-the-ai-revolutions-essential-nervous-system\n3. [TSLA/stocktwits] [neutral] https://stocktwits.com/message/652114051\n4. [TSLA/Barchart.com] https://www.barchart.com/story/news/1524605/better-later-than-never-tesla-stock-hangs-in-the-crosshairs-as-cybercab-finally-enters-production\n5. [TSLA/Barchart.com] https://www.barchart.com/story/news/1565247/with-the-cybercab-in-production-should-you-buy-sell-or-hold-tesla-stock-now\n6. [TSLA/Barchart.com] https://www.barchart.com/story/news/1613794/these-low-iv-stocks-may-be-setting-up-for-an-explosive-move\n7. [TSLA/stocktwits] [neutral] https://stocktwits.com/message/652114163\n8. [TSLA/stocktwits] [neutral] https://stocktwits.com/message/652109963\n9. [TSLA/hackernews] https://jumpstartsignal.com/\n10. [TSLA/hackernews] https://www.businessinsider.com/tesla-q1-earnings-updates-tsla-stock-robotaxis-elon-musk-2026-4",
+      "error": null
+    },
+    {
+      "id": "q3",
+      "category": "news_only",
+      "ticker_used": "NVDA",
+      "expected_sources": [
+        "news"
+      ],
+      "found_source_categories": [
+        "hackernews",
+        "news",
+        "stocktwits"
+      ],
+      "retrieval_pass": true,
+      "reasoning_score": 0.5,
+      "expected_keywords": [
+        "ai",
+        "data center",
+        "chips",
+        "demand"
+      ],
+      "briefing": "**Summary:** Nvidia\u2019s stock has surged, driven by its established position as a global leader in AI, bolstered by a record high stock price and continued demand from the semiconductor sector. However, this success is shadowed by growing competition from Amazon and Alphabet, which could negatively impact the company\u2019s long-term market share.\n\n**Key Signals:**\n- News: Nvidia\u2019s stock price is trending upward, exceeding $211.\n- Retail sentiment: StockTwits shows increased volatility and a focus on \u2018buy the dip\u2019 strategies.\n- Risks: Rising competition from Amazon and Alphabet could significantly impact Nvidia\u2019s market share and long-term profitability.\n\n**Watch:** Monitor the volume of StockTwits activity related to Nvidia\u2019s stock and assess whether the \u2018buy the dip\u2019 mentality is sustained.\n\n**Sources:**\n1. [NVDA/Barchart.com] https://www.barchart.com/story/news/1628530/should-you-buy-the-dip-in-nvidia-stock-today\n2. [NVDA/stocktwits] [bullish] https://stocktwits.com/message/652112552\n3. [NVDA/Dailyreckoning.com] https://dailyreckoning.com/the-semiconductor-bubble-goes-nuclear/\n4. [NVDA/Crypto Briefing] https://cryptobriefing.com/nvidia-stock-hits-record-high-semiconductor-sector-sees-19th-session-of-gains/\n5. [NVDA/Barchart.com] https://www.barchart.com/story/news/1619169/amd-stock-just-got-a-new-street-high-price-target-should-you-buy-shares-here\n6. [NVDA/Yahoo Entertainment] https://finance.yahoo.com/markets/stocks/articles/why-nvidia-nvda-among-best-160327904.html\n7. [NVDA/Barchart.com] https://www.barchart.com/story/news/1563660/nokia-stock-just-hit-a-16-year-high-should-you-chase-the-rally-here\n8. [NVDA/stocktwits] [neutral] https://stocktwits.com/message/652110080\n9. [NVDA/hackernews] https://news.ycombinator.com/item?id=47740552",
+      "error": null
+    },
+    {
+      "id": "q4",
+      "category": "news_only",
+      "ticker_used": "MSFT",
+      "expected_sources": [
+        "news"
+      ],
+      "found_source_categories": [
+        "hackernews",
+        "news",
+        "stocktwits"
+      ],
+      "retrieval_pass": true,
+      "reasoning_score": 0.5,
+      "expected_keywords": [
+        "azure",
+        "ai",
+        "cloud",
+        "copilot"
+      ],
+      "briefing": "**Summary:**\n\nMicrosoft\u2019s stock price, earnings, and quarterly cloud revenue growth have fallen after the company released its quarterly results and updated its cloud results and AI spending. This decline is likely due to the company\u2019s cloud results and AI spending updates, potentially hindering investor expectations. The company\u2019s investor relations and quarterly cloud revenue growth are also under scrutiny, with investors closely watching Microsoft\u2019s performance in the cloud computing space. Michael Burry, a well-known investor, has disagreed with the AI narrative and has bought Microsoft stock, as well as two other unexpected names, suggesting he believes the company has potential for growth despite the current decline in its stock price. The surge in AI spending, with hyperscaler capex set to reach $725 billion in 2026, is likely to have a significant impact on the tech industry, with companies like Microsoft investing heavily in AI research and development. The fact that four of the Magnificent Seven tech giants are still on track to meet their massive artificial intelligence spending targets suggests that the industry is committed to investing in AI, despite the current economic uncertainty.\n\n**Key Signals:**\n\n*   **News:** Microsoft\u2019s stock price, earnings, and quarterly cloud revenue growth have fallen after the company released its quarterly results and updated its cloud results and AI spending.\n*   **Retail sentiment:** Investor sentiment is mixed, with some analysts expressing concern about the company\u2019s cloud performance.\n*   **Risks:** The decline in Microsoft\u2019s stock price, earnings, and quarterly cloud revenue growth may indicate that the company\u2019s performance has fallen short of investor expectations.  The scrutiny of Microsoft\u2019s investor relations and quarterly cloud revenue growth, with investors closely watching the company\u2019s performance in the cloud computing space, may lead to further declines in the stock price if the company fails to meet expectations.\n\n**Watch:**\n\n*   Hyperscaler capex to reach $725 billion in 2026\n*   Microsoft\u2019s own stock price fell precisely because of its AI spending updates.\n*   The overall health of the AI industry \u2013 specifically, the commitment of the Magnificent Seven to AI investment.\n\n**Sources:**\n1. [MSFT/The Times of India] https://economictimes.indiatimes.com/news/international/us/microsoft-stock-price-earnings-investor-relations-and-quarterly-cloud-revenue-growth-fall-after-cloud-results-and-ai-spending-updates/articleshow/130618799.cms\n2. [MSFT/Barchart.com] https://www.barchart.com/story/news/1559822/michael-burry-disagrees-with-the-ai-narrative-buys-microsoft-stock-and-2-unexpected-names\n3. [MSFT/stocktwits] [bullish] https://stocktwits.com/message/652106749\n4. [MSFT/Barchart.com] https://www.barchart.com/story/news/1604257/why-dan-ives-is-betting-on-35-upside-for-oracle-stock-this-secret-sauce-will-make-orcl-a-key-part-of-the-ai-revolution\n5. [MSFT/stocktwits] [neutral] https://stocktwits.com/message/652113965\n6. [MSFT/Yahoo Entertainment] https://finance.yahoo.com/markets/article/magnificent-7-earnings-rush-reveals-ai-spending-surge-with-hyperscaler-capex-set-to-reach-725-billion-in-2026-224901707.html\n7. [MSFT/CoinDesk] https://www.coindesk.com/markets/2026/04/29/big-tech-s-multi-billion-dollar-ai-bets-are-still-on-track-as-mag-7-giants-report-earnings\n8. [MSFT/Barchart.com] https://www.barchart.com/story/news/1540837/apple-is-falling-behind-in-ai-will-a-new-ceo-revive-apple-stock\n9. [MSFT/hackernews] https://news.ycombinator.com/item?id=47945581",
+      "error": null
+    },
+    {
+      "id": "q5",
+      "category": "news_only",
+      "ticker_used": "AMZN",
+      "expected_sources": [
+        "news"
+      ],
+      "found_source_categories": [
+        "hackernews",
+        "news",
+        "stocktwits"
+      ],
+      "retrieval_pass": true,
+      "reasoning_score": 0.75,
+      "expected_keywords": [
+        "aws",
+        "retail",
+        "margin",
+        "growth"
+      ],
+      "briefing": "**Summary:**\n\nAmazon\u2019s stock is experiencing a significant surge following a report highlighting its growing chip business, particularly its potential to surpass AMD and Intel in the industry. The Q1 revenue boost from AWS, driven by a 15-quarter growth high, further strengthens the narrative of Amazon\u2019s cloud dominance. However, the analyst\u2019s assessment lacks crucial nuance, particularly concerning the chip market\u2019s competitive landscape and the potential for increased storage competition. The risk assessment is overly simplistic, failing to account for the strategic implications of Amazon\u2019s investments in AI infrastructure and the potential for slower growth in its core e-commerce and cloud businesses.\n\n**Key Signals:**\n\n*   **News:** Amazon\u2019s chip business is growing faster than AMD and Intel, potentially surpassing Broadcom and Intel.\n*   **Retail Sentiment:** Positive sentiment surrounding AWS growth and Amazon\u2019s cloud leadership.\n*   **Risks:** Increased competition in the cloud and chip markets, potential for slower growth in core businesses, and storage crunch fueled by AI.\n\n**Watch:**\n\n*   Amazon\u2019s Graviton processor roadmap update.\n*   AWS\u2019s AI investment and potential for increased data storage demand.\n*   Geopolitical tensions impacting semiconductor supply chains.\n\n**Sources:**\n1. [AMZN/stocktwits] [neutral] https://stocktwits.com/message/652114083\n2. [AMZN/Barchart.com] https://www.barchart.com/story/news/1628530/should-you-buy-the-dip-in-nvidia-stock-today\n3. [AMZN/Barchart.com] https://www.barchart.com/story/news/1628055/3-reasons-why-marvell-stock-is-a-buy-now\n4. [AMZN/stocktwits] [neutral] https://stocktwits.com/message/652102371\n5. [AMZN/Barchart.com] https://www.barchart.com/story/news/1541033/amazon-s-chip-business-is-bigger-than-amd-could-soon-pass-broadcom-intel\n6. [AMZN/Yahoo Entertainment] https://finance.yahoo.com/markets/article/why-data-storage-stocks-are-a-key-ai-play-130000724.html\n7. [AMZN/Yahoo Entertainment] https://finance.yahoo.com/markets/stocks/articles/ups-close-27-additional-parcel-134020058.html\n8. [AMZN/TheStreet] https://www.thestreet.com/investing/stocks/morgan-stanley-revamps-oracle-stock-price-target\n9. [AMZN/hackernews] https://finance.yahoo.com/sectors/technology/article/amazon-q1-revenue-tops-estimates-as-aws-hits-15-quarter-growth-high-132251368.html",
+      "error": null
+    },
+    {
+      "id": "q6",
+      "category": "cross_source",
+      "ticker_used": "AAPL",
+      "expected_sources": [
+        "news",
+        "stocktwits"
+      ],
+      "found_source_categories": [
+        "hackernews",
+        "news",
+        "stocktwits"
+      ],
+      "retrieval_pass": true,
+      "reasoning_score": 0.75,
+      "expected_keywords": [
+        "bullish",
+        "bearish",
+        "iphone",
+        "sentiment"
+      ],
+      "briefing": "**Summary:**\n\nApple (AAPL) is currently trading at a higher valuation, reflecting analyst optimism regarding its iPhone and overall financial health. The company\u2019s strong iPhone revenue, despite supply chain challenges, demonstrates its ability to maintain sales. However, potential supply chain disruptions and a failure to sustain strong sales in China pose risks to the stock\u2019s price. Morgan Stanley\u2019s price target increase suggests increased investor confidence, potentially driving the stock\u2019s price upward.\n\n**Key Signals:**\n\n*   **News:** Apple\u2019s iPhone revenue has jumped to $57B, demonstrating the company\u2019s ability to navigate supply chain challenges and maintain strong sales.\n*   **Retail sentiment:** The market is generally positive, with investors showing confidence in Apple\u2019s long-term prospects.\n*   **Risks:** Potential supply chain disruptions and a failure to sustain strong sales in China could negatively impact the stock\u2019s price.\n\n**Watch:**\n\n*   Tomorrow: Monitor the release of Apple\u2019s Q3 earnings report and analyst commentary on the iPhone\u2019s performance in China.\n\n**Sources:**\n1. [AAPL/stocktwits] [bullish] https://stocktwits.com/message/652111258\n2. [AAPL/stocktwits] [bullish] https://stocktwits.com/message/652114123\n3. [AAPL/stocktwits] [neutral] https://stocktwits.com/message/652108880\n4. [AAPL/Barchart.com] https://www.barchart.com/story/news/1538016/apple-stock-analyst-estimates-ratings\n5. [AAPL/stocktwits] [neutral] https://stocktwits.com/message/652111324\n6. [AAPL/stocktwits] [neutral] https://stocktwits.com/message/652111289\n7. [AAPL/stocktwits] [neutral] https://stocktwits.com/message/652113642\n8. [AAPL/Barchart.com] https://www.barchart.com/story/news/1621672/stocks-see-support-from-lower-crude-prices-while-mega-cap-tech-earnings-are-mixed\n9. [AAPL/hackernews] https://www.theverge.com/tech/921527/apple-iphone-revenue-q2-2026-earnings\n10. [AAPL/hackernews] https://finance.yahoo.com/video/apple-beats-on-q2-earnings-thanks-to-china--iphone-sales-204052273.html",
+      "error": null
+    },
+    {
+      "id": "q7",
+      "category": "cross_source",
+      "ticker_used": "NVDA",
+      "expected_sources": [
+        "news",
+        "hackernews"
+      ],
+      "found_source_categories": [
+        "hackernews",
+        "news",
+        "stocktwits"
+      ],
+      "retrieval_pass": true,
+      "reasoning_score": 0.25,
+      "expected_keywords": [
+        "ai",
+        "gpu",
+        "valuation",
+        "skepticism"
+      ],
+      "briefing": "**Summary:** Nvidia\u2019s stock is currently trading under $200, driven by investor nervousness surrounding competition from Amazon and Alphabet, despite the company\u2019s strong position in the AI build-out and Jensen Huang\u2019s leadership. The long-term outlook remains positive, bolstered by the company\u2019s dominance in the AI sector and the potential for continued growth, though challenges related to the weakening of its moat pose a significant risk.\n\n**Key Signals:**\n- News: Rising investor anxiety regarding competition from Amazon and Alphabet.\n- Retail sentiment: Negative sentiment on Nvidia\u2019s stock price.\n- Risks: Weakening of the company\u2019s moat, potential for margin compression, and a potential shift in market dynamics.\n\n**Watch:** Monitor the progress of the AI build-out and the competitive landscape.\n\n**Sources:**\n1. [NVDA/Barchart.com] https://www.barchart.com/story/news/1628530/should-you-buy-the-dip-in-nvidia-stock-today\n2. [NVDA/stocktwits] [bullish] https://stocktwits.com/message/652112552\n3. [NVDA/Dailyreckoning.com] https://dailyreckoning.com/the-semiconductor-bubble-goes-nuclear/\n4. [NVDA/Crypto Briefing] https://cryptobriefing.com/nvidia-stock-hits-record-high-semiconductor-sector-sees-19th-session-of-gains/\n5. [NVDA/Barchart.com] https://www.barchart.com/story/news/1619169/amd-stock-just-got-a-new-street-high-price-target-should-you-buy-shares-here\n6. [NVDA/Yahoo Entertainment] https://finance.yahoo.com/markets/stocks/articles/why-nvidia-nvda-among-best-160327904.html\n7. [NVDA/Barchart.com] https://www.barchart.com/story/news/1563660/nokia-stock-just-hit-a-16-year-high-should-you-chase-the-rally-here\n8. [NVDA/stocktwits] [neutral] https://stocktwits.com/message/652110080\n9. [NVDA/hackernews] https://news.ycombinator.com/item?id=47740552",
+      "error": null
+    },
+    {
+      "id": "q8",
+      "category": "cross_source",
+      "ticker_used": "TSLA",
+      "expected_sources": [
+        "news",
+        "stocktwits"
+      ],
+      "found_source_categories": [
+        "hackernews",
+        "news",
+        "stocktwits"
+      ],
+      "retrieval_pass": true,
+      "reasoning_score": 0.0,
+      "expected_keywords": [
+        "deliveries",
+        "bullish",
+        "bearish",
+        "volatility"
+      ],
+      "briefing": "**Summary:**\n\nTesla (TSLA) is currently navigating a complex landscape with potential shifts in its business model. Elon Musk\u2019s rumored acquisition of Spirit Airlines could significantly boost the company\u2019s revenue and stock price, but this comes with inherent risks related to investor confidence and potential legal complications. The successful production of the Cybercab represents a significant milestone, potentially driving up the stock price, but the mixed results of Tesla\u2019s Q1 2026 earnings report pose a concern for investor sentiment.  The ongoing legal battle with Sam Altman adds further uncertainty, potentially triggering a decline in the stock price.\n\n**Key Signals:**\n\n*   **News:** Elon Musk\u2019s rumored acquisition of Spirit Airlines, mixed Q1 2026 earnings results, Cybercab production milestone.\n*   **Retail sentiment:** High sensitivity to innovation themes and sentiment, retail trading based on low H% strategies.\n*   **Risks:** Decreased investor confidence due to earnings results, legal battle with Sam Altman, potential dilution.\n\n**Watch:**\n\n*   Monitor Spirit Airlines\u2019 progress and potential integration with Tesla\u2019s existing operations.\n*   Track the evolving legal landscape surrounding the Sam Altman-Elon Musk relationship.\n*   Analyze Tesla\u2019s Q1 2026 earnings report for deeper insights into operational performance.\n\n**Sources:**\n1. [TSLA/stocktwits] [neutral] https://stocktwits.com/message/652108218\n2. [TSLA/Barchart.com] https://www.barchart.com/story/news/1563347/as-the-number-of-iot-devices-starts-to-surge-verizon-no-longer-relies-on-traditional-subscriber-growth-vz-stock-is-part-of-the-ai-revolutions-essential-nervous-system\n3. [TSLA/stocktwits] [neutral] https://stocktwits.com/message/652114051\n4. [TSLA/Barchart.com] https://www.barchart.com/story/news/1524605/better-later-than-never-tesla-stock-hangs-in-the-crosshairs-as-cybercab-finally-enters-production\n5. [TSLA/Barchart.com] https://www.barchart.com/story/news/1565247/with-the-cybercab-in-production-should-you-buy-sell-or-hold-tesla-stock-now\n6. [TSLA/Barchart.com] https://www.barchart.com/story/news/1613794/these-low-iv-stocks-may-be-setting-up-for-an-explosive-move\n7. [TSLA/stocktwits] [neutral] https://stocktwits.com/message/652114163\n8. [TSLA/stocktwits] [neutral] https://stocktwits.com/message/652109963\n9. [TSLA/hackernews] https://jumpstartsignal.com/\n10. [TSLA/hackernews] https://www.businessinsider.com/tesla-q1-earnings-updates-tsla-stock-robotaxis-elon-musk-2026-4",
+      "error": null
+    },
+    {
+      "id": "q9",
+      "category": "cross_source",
+      "ticker_used": "MSFT",
+      "expected_sources": [
+        "news",
+        "hackernews"
+      ],
+      "found_source_categories": [
+        "hackernews",
+        "news",
+        "stocktwits"
+      ],
+      "retrieval_pass": true,
+      "reasoning_score": 0.25,
+      "expected_keywords": [
+        "copilot",
+        "azure",
+        "ai",
+        "adoption"
+      ],
+      "briefing": "**Summary:**\n\nMicrosoft\u2019s stock price and quarterly cloud revenue growth have been affected by the company\u2019s earnings and AI spending updates. Investors are concerned about the market\u2019s undervaluation of Microsoft\u2019s earnings, particularly considering its strong growth and potential for future expansion, driven by its position in the tech industry and investments in AI. The company faces risks related to the potential for cloud revenue shortfalls and increased competition from Oracle.\n\n**Key Signals:**\n\n*   **News:** Microsoft\u2019s earnings and cloud results have been impacted by the release of quarterly results.\n*   **Retail Sentiment:** Investors are expressing concern about the market\u2019s undervaluation of Microsoft\u2019s earnings growth, particularly considering its strong growth and potential for future expansion.\n*   **Risks:** The company faces risks related to cloud revenue shortfalls and increased competition from Oracle.\n\n**Watch:**\n\n*   Monitor cloud revenue growth trends and potential for AI-driven revenue.\n*   Assess the sustainability of AI-driven revenue growth.\n\n**Sources:**\n1. [MSFT/stocktwits] [neutral] https://stocktwits.com/message/652113965\n2. [MSFT/stocktwits] [bullish] https://stocktwits.com/message/652106749\n3. [MSFT/The Times of India] https://economictimes.indiatimes.com/news/international/us/microsoft-stock-price-earnings-investor-relations-and-quarterly-cloud-revenue-growth-fall-after-cloud-results-and-ai-spending-updates/articleshow/130618799.cms\n4. [MSFT/Trefis] https://www.trefis.com/articles/597356/what-justifies-home-depots-23x-multiple/2026-04-27\n5. [MSFT/stocktwits] [neutral] https://stocktwits.com/message/652114068\n6. [MSFT/stocktwits] [bullish] https://stocktwits.com/message/652108754\n7. [MSFT/stocktwits] [bullish] https://stocktwits.com/message/652103528\n8. [MSFT/Barchart.com] https://www.barchart.com/story/news/1621672/stocks-see-support-from-lower-crude-prices-while-mega-cap-tech-earnings-are-mixed\n9. [MSFT/hackernews] https://news.ycombinator.com/item?id=47945581",
+      "error": null
+    },
+    {
+      "id": "q10",
+      "category": "cross_source",
+      "ticker_used": "?",
+      "expected_sources": [
+        "news",
+        "stocktwits",
+        "hackernews"
+      ],
+      "found_source_categories": [],
+      "retrieval_pass": false,
+      "reasoning_score": 0.0,
+      "expected_keywords": [
+        "aws",
+        "margin",
+        "bullish",
+        "automation"
+      ],
+      "briefing": "",
+      "error": "litellm.RateLimitError: RateLimitError: GroqException - {\"error\":{\"message\":\"Rate limit reached for model `llama-3.3-70b-versatile` in organization `org_01kqby9zn8edy8qeeyzfnzzr46` service tier `on_demand` on tokens per day (TPD): Limit 100000, Used 98226, Requested 2359. Please try again in 8m25.44s. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing\",\"type\":\"tokens\",\"code\":\"rate_limit_exceeded\"}}\n"
+    }
+  ]
+}
