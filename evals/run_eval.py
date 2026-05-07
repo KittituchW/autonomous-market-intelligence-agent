@@ -13,21 +13,19 @@ import time
 from pathlib import Path
 from datetime import datetime
 
-# add project root to path so we can import graph.py from inside evals/
+# add project root to path so package imports work from inside evals/
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from graph import run_for_question
-from tracing import flush as flush_tracing
+from amia.pipeline.graph import run_for_question
+from amia.observability.tracing import flush as flush_tracing
 
 EVAL_PATH = Path(__file__).parent / "eval_set_v1.json"
 RESULTS_PATH = Path(__file__).parent / f"results_{datetime.now().strftime('%Y%m%d')}.json"
 
-# Sleep between questions so we do not trip Groq's rate limit running 10 back to back.
-# Groq free tier on llama-3.3-70b-versatile: 30 RPM, 6k TPM, 100k TPD.
-# Each question fires planner + crew, ~5-8 calls and ~10k tokens per question.
-# 10s gives TPM headroom. Day 12 also wired a Gemini fallback in crew.py so a
-# TPD hit no longer kills the run mid-way.
+# Sleep between questions so we do not trip Groq's rate limit running 10
+# back to back. Each question fires planner + crew (~5-8 calls and ~10k
+# tokens). 10s gives TPM headroom; the LiteLLM Gemini fallback covers TPD.
 SLEEP_BETWEEN_QUESTIONS = 10
 
 

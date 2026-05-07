@@ -1,19 +1,11 @@
-"""Day 3-5: 4-agent CrewAI crew. Researcher + Analyst on Groq, Critic on Groq 8B, Writer on local Gemma.
-
-Day 5 update: researcher now has access to compare_news_and_social, a sub-question
-engine that routes between news-only and social-only retrieval.
-
-Day 12 update: Groq -> Gemini fallback wired via LiteLLM globals so a TPD/TPM
-hit on Groq doesn't kill an eval run mid-way. The crew calls litellm under
-the hood, so setting litellm.fallbacks once here propagates to every agent.
-"""
+"""4-agent CrewAI crew. Researcher + Analyst on Groq, Critic on Gemini, Writer on local Gemma."""
 import os
 import litellm
 from dotenv import load_dotenv
 from crewai import Agent, Task, Crew, Process, LLM
-from subquery import compare_news_and_social
-from usage_log import litellm_callback as _usage_callback
-from models import (
+from amia.retrieval.subquery import compare_news_and_social
+from amia.observability.usage_log import litellm_callback as _usage_callback
+from amia.config.models import (
     RESEARCHER_MODEL,
     ANALYST_MODEL,
     CRITIC_MODEL,
@@ -25,39 +17,25 @@ from models import (
 
 load_dotenv()
 
-# Day 12 task 4: every successful crew agent call lands in logs/token_usage.jsonl
-# litellm.success_callback is a list of either string names or callables.
-# Append our callable so it runs alongside any existing callbacks.
+# Every successful crew agent call lands in logs/token_usage.jsonl.
+# Guard against duplicate registration when this module is imported twice
+# (e.g. test runners), which would produce duplicate log entries.
 if not isinstance(litellm.success_callback, list):
     litellm.success_callback = []
-litellm.success_callback.append(_usage_callback)
+if _usage_callback not in litellm.success_callback:
+    litellm.success_callback.append(_usage_callback)
 
-# CrewAI 0.51 wants its own LLM wrapper (LiteLLM under the hood),
-# not langchain_groq / langchain_google_genai / langchain_ollama objects directly.
-# Model strings follow LiteLLM convention: <provider>/<model_id>.
-
-# --- Day 12: rate-limit reliability ---
-# When Groq hits TPD (100k/day on free tier) or TPM (6k/min), automatically
-# fall back to Gemini. LiteLLM checks these globals on every completion call.
-# Day 13: fallback list now covers the NEW per-agent model ids.
-litellm.num_retries = 2  # transient errors get a free retry first
+# When Groq hits TPD or TPM, LiteLLM automatically falls back to Gemini.
+litellm.num_retries = 2
 litellm.fallbacks = [
     {RESEARCHER_MODEL: [GEMINI_FALLBACK_MODEL]},
     {ANALYST_MODEL: [GEMINI_FALLBACK_MODEL]},
-    # Writer runtime fallback. If gemma3:4b times out or OOMs mid-generation
-    # (8GB RAM is tight when Chrome + Cursor + Qdrant are also resident),
-    # LiteLLM transparently retries on Gemini 3.1 Flash Lite.
+    # On 8GB RAM gemma3:4b can OOM or time out mid-generation; runtime
+    # fallback to Gemini keeps the briefing flowing.
     {WRITER_MODEL: [WRITER_FALLBACK_MODEL]},
 ]
 
-# --- Day 13: per-agent model split ---
-# Previously researcher + analyst shared one Llama 3.3 70B instance. We split
-# them so each agent gets the model that fits its job:
-#   - Researcher reads many docs and extracts cited facts -> Llama 4 Scout
-#     (long context + high throughput on Groq)
-#   - Analyst does numerical reasoning over the findings -> Qwen3-32B
-#     (consistently strongest open model on math at this size)
-# Needs GROQ_API_KEY env var set, which load_dotenv handles above.
+
 def _force_text_tool_mode(llm: LLM) -> LLM:
     """Use CrewAI's text tool loop instead of provider-native tool calls.
 
@@ -83,20 +61,16 @@ analyst_llm = LLM(
     api_key=os.getenv("GROQ_API_KEY"),
 )
 
-# Critic uses a different vendor (Gemini) for diversity so it does not anchor
-# on the analyst. Top wants this kept on Gemini 3.1 Flash Lite Preview.
+# Critic uses a different vendor for diversity so it does not anchor on the analyst.
 os.environ["GEMINI_API_KEY"] = os.getenv("GEMINI_API_KEY", "")
 critic_llm = LLM(model=CRITIC_MODEL, temperature=0)
 
-# --- Local writer with cloud fallback ---
-# Day 13: writer runs on local Gemma 3 4B by default. On 8GB RAM the 4B model
-# is borderline -- if Chrome/Cursor/Qdrant are also resident it can OOM or
-# time out. Three escape hatches, in order of cost:
+
+# Writer runs on local Gemma by default. Three escape hatches in order of cost:
 #   1. AMIA_WRITER=cloud env var -> skip Ollama entirely, use Gemini
-#   2. Pre-flight check at module load -> if Ollama is down or gemma3:4b
-#      is not pulled, swap to Gemini before the crew is built
-#   3. LiteLLM fallback (above) -> if the writer crashes mid-run, the next
-#      call retries on Gemini transparently
+#   2. Pre-flight check at module load -> swap to Gemini if Ollama is down
+#      or gemma3:4b is not pulled
+#   3. LiteLLM fallback (above) -> retry on Gemini if the writer crashes mid-run
 def _pick_writer_llm():
     """Choose the writer LLM. Local Gemma if reachable, else Gemini."""
     forced = os.getenv("AMIA_WRITER", "").strip().lower()
@@ -175,7 +149,7 @@ def build_crew(ticker: str, context: str, sources: list[dict], verbose: bool = T
     sources_block = _format_sources_block(sources)
 
     # 1. Researcher: scans context, picks the material signals.
-    # Day 5: gets compare_news_and_social as a tool for hard cross-source questions.
+    # compare_news_and_social tool handles cross-source questions.
     researcher = Agent(
         role="Financial Researcher",
         goal=f"Identify the 3 most material developments about {ticker} from the retrieved context",
@@ -187,7 +161,7 @@ def build_crew(ticker: str, context: str, sources: list[dict], verbose: bool = T
             "does not clearly show the news vs retail sentiment divergence."
         ),
         llm=researcher_llm,
-        tools=[compare_news_and_social],  # Day 5 sub-question engine wrapped as tool
+        tools=[compare_news_and_social],
         allow_delegation=False,
         verbose=verbose,
     )
@@ -242,7 +216,8 @@ def build_crew(ticker: str, context: str, sources: list[dict], verbose: bool = T
             f"CONTEXT (read this carefully):\n{context}\n\n"
             f"NUMBERED SOURCES (cite by id):\n{sources_block}\n\n"
             "Pick the 3 most material signals. For each, write 2-3 sentences "
-            "and cite the source [id]. Do not fabricate."
+            "and cite the source [id]. Use only ids from NUMBERED SOURCES. "
+            "Do not fabricate facts, ids, or URLs."
         ),
         expected_output="3 numbered findings, each with source [id] citations",
         agent=researcher,
@@ -282,7 +257,10 @@ def build_crew(ticker: str, context: str, sources: list[dict], verbose: bool = T
             "**Watch:** one line on what to track tomorrow.\n\n"
             "**Sources:** numbered list of cited [id] entries with URLs.\n\n"
             "Incorporate the critic's pushback. Only cite sources actually "
-            "discussed by the researcher or analyst. No fluff, no buzzwords."
+            "discussed by the researcher or analyst. The News bullet must cite "
+            "at least one news source id, the Retail sentiment bullet must cite "
+            "at least one social source id, and the Sources block must reuse "
+            "the exact retrieved URLs. No fluff, no buzzwords."
         ),
         expected_output="A clean markdown briefing with the 4 sections above",
         agent=writer,
@@ -299,9 +277,9 @@ def build_crew(ticker: str, context: str, sources: list[dict], verbose: bool = T
     )
 
 
-if __name__ == "__main__":
+def main() -> None:
     # quick smoke test on TSLA, pulls real context from the index
-    from retrieval import retrieve_with_sources
+    from amia.retrieval.index import retrieve_with_sources
 
     context, sources = retrieve_with_sources(
         "TSLA news earnings sentiment risks", top_k=8
@@ -315,3 +293,7 @@ if __name__ == "__main__":
     print("FINAL BRIEFING")
     print("=" * 60)
     print(result)
+
+
+if __name__ == "__main__":
+    main()

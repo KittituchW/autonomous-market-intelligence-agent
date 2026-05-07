@@ -1,26 +1,23 @@
 import os
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from newsapi import NewsApiClient
 from dotenv import load_dotenv
 
+from amia.config import TICKERS
+
 load_dotenv()
 
-# init NewsAPI client
 newsapi = NewsApiClient(api_key=os.getenv("NEWSAPI_KEY"))
-
-# the 5 tickers we care about
-TICKERS = ["AAPL", "TSLA", "NVDA", "MSFT", "AMZN"]
 
 BLOCKED_DOMAINS = [
     "rlsbb.to", "pypi.org", "cointelegraph.com",
     "marketbeat.com", "post.rlsbb.to"
 ]
 
-# Day 12 task 2: NewsAPI free tier is 100 requests/day. We pre-check the
-# counter and bail before the call, so a quota-bust does not waste a request
-# on a 429. Counter resets at UTC midnight.
+# Pre-check the counter and bail before the call so a quota-bust does not
+# waste a request on a 429. Counter resets at UTC midnight.
 NEWSAPI_DAILY_LIMIT = 100
 _NEWSAPI_COUNTER = Path("logs/newsapi_count.json")
 
@@ -41,7 +38,7 @@ def _save_counter(state: dict) -> None:
 
 def _check_and_bump_quota() -> bool:
     """Bump today's NewsAPI counter by 1 if under the limit. Return True if ok."""
-    today = datetime.utcnow().strftime("%Y-%m-%d")
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     state = _load_counter()
     if state.get("date") != today:
         state = {"date": today, "count": 0}
@@ -99,10 +96,14 @@ def save_articles(ticker: str, articles: list[dict]):
         json.dump(articles, f, indent=2)
     print(f"Saved {len(articles)} articles for {ticker} -> {output_path}")
 
-if __name__ == "__main__":
+def main() -> None:
     total = 0
     for ticker in TICKERS:
         articles = fetch_news_for_ticker(ticker, num_articles=40)
         save_articles(ticker, articles)
         total += len(articles)
     print(f"\nTotal articles saved: {total}")
+
+
+if __name__ == "__main__":
+    main()

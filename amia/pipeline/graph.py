@@ -1,45 +1,40 @@
-"""Day 3 LangGraph: plan -> retrieve -> write (CrewAI 4-agent crew), with one retry on empty retrieval.
-
-Day 11 updates:
-  - retrieve_node now passes ticker to retrieve_with_sources for the metadata filter
-    + StockTwits/HackerNews quotas. Stops the cross-ticker leakage the Day 9
-    trace caught (AMZN run getting NVDA / MSFT articles).
-  - write_node now strips the writer's hallucinated Sources block and replaces
-    it with the real URLs from state["sources"]. The Gemma 3 1B writer was
-    inventing Bloomberg/Reuters URLs from scratch; this kills that for good.
-"""
+"""LangGraph: plan -> retrieve -> write (CrewAI 4-agent crew), with one retry on empty retrieval."""
 import os
-import re
 from typing import TypedDict
 from dotenv import load_dotenv
 from langgraph.graph import StateGraph, END
 from langchain_groq import ChatGroq
 from langchain_google_genai import ChatGoogleGenerativeAI
-from retrieval import search_news, retrieve_with_sources
-from crew import build_crew
-from usage_log import log as _usage_log
-from models import PLANNER_MODEL_BARE, GEMINI_MODEL_BARE
+from amia.config import TICKERS
+from amia.config.models import PLANNER_MODEL_BARE, GEMINI_MODEL_BARE
+from amia.observability.usage_log import log as _usage_log
+from amia.pipeline.crew import build_crew
+from amia.quality.briefing_quality import (
+    build_fallback_briefing,
+    replace_sources_block,
+    validate_briefing,
+)
+from amia.retrieval.index import retrieve_with_sources
 
 load_dotenv()
 
-# planner uses Groq directly. The crew handles its own LLMs in the write node.
-# Day 13: switched from llama-3.3-70b-versatile to gpt-oss-120b. Planning is
-# the choke point of the pipeline; weak decomposition cascades into bad
-# retrieval queries, so we pay for the bigger reasoning model here.
+# Planning is the choke point: weak decomposition cascades into bad retrieval
+# queries, so we pay for the bigger reasoning model here.
 llm = ChatGroq(
     model=PLANNER_MODEL_BARE,
     temperature=0,
     api_key=os.getenv("GROQ_API_KEY"),
 )
 
-# Day 12: planner fallback. langchain_groq raises groq.RateLimitError on 429,
-# but litellm-style errors leak through too, so we match on the message.
-# Same Gemini model the crew critic uses.
+# Planner fallback. langchain_groq raises groq.RateLimitError on 429, but
+# litellm-style errors leak through too, so we match on the message.
 fallback_llm = ChatGoogleGenerativeAI(
     model=GEMINI_MODEL_BARE,
     temperature=0,
     google_api_key=os.getenv("GEMINI_API_KEY"),
 )
+
+_RATE_LIMIT_TOKENS = ("rate_limit", "ratelimit", "429", "tpd", "tpm")
 
 
 def _invoke_with_fallback(prompt: str) -> str:
@@ -48,9 +43,6 @@ def _invoke_with_fallback(prompt: str) -> str:
     The crew has its own fallback wired via litellm globals in crew.py.
     This function only covers the plan_node call which goes through
     langchain_groq, not litellm.
-
-    Day 12 task 4: every call (success OR fallback) is logged to
-    logs/token_usage.jsonl so `python usage_log.py` can show daily totals.
     """
     try:
         resp = llm.invoke(prompt)
@@ -65,14 +57,7 @@ def _invoke_with_fallback(prompt: str) -> str:
         return resp.content
     except Exception as e:
         msg = str(e).lower()
-        is_rate_limit = (
-            "rate_limit" in msg
-            or "ratelimit" in msg
-            or "429" in msg
-            or "tpd" in msg
-            or "tpm" in msg
-        )
-        if not is_rate_limit:
+        if not any(token in msg for token in _RATE_LIMIT_TOKENS):
             raise
         print("[plan] Groq rate limited, falling back to Gemini")
         resp = fallback_llm.invoke(prompt)
@@ -93,6 +78,7 @@ class State(TypedDict):
     context: str
     sources: list  # structured citations passed into the crew
     briefing: str
+    quality_warnings: list[str]
     retries: int  # tracks how many times retrieve has been re-run
 
 
@@ -111,8 +97,7 @@ def plan_node(state: State) -> dict:
 def retrieve_node(state: State) -> dict:
     """Run the plan as a retrieval query, return both formatted text and structured sources.
 
-    Day 11: passes ticker so retrieve_with_sources hard-filters on metadata
-    AND tops up with StockTwits + HackerNews quotas.
+    Passing ticker hard-filters on metadata and adds StockTwits + HackerNews quotas.
     """
     query = f"{state['ticker']} {state['plan']}"
     context, sources = retrieve_with_sources(
@@ -131,67 +116,43 @@ def retrieve_node(state: State) -> dict:
     }
 
 
-# Matches a Sources/Source heading line in any of the forms the writer emits:
-#   "**Sources:**", "Sources:", "**Source**", "## Sources", etc. Case-insensitive.
-_SOURCES_HEADING = re.compile(
-    r"^\s*(?:#+\s*)?\**\s*sources?\s*:?\s*\**\s*$", re.IGNORECASE
-)
-
-
-def _replace_sources_block(briefing: str, sources: list[dict]) -> str:
-    """Strip whatever Sources block the writer produced, append the real URLs.
-
-    The Gemma 3 1B writer kept hallucinating Bloomberg / Reuters URLs that did
-    not exist in retrieval. The real URLs are sitting right there in
-    state["sources"]. So we just overwrite.
-    """
-    if not sources:
-        return briefing
-
-    real_lines = []
-    for s in sources:
-        url = s.get("url")
-        if not url:
-            continue
-        sentiment = f" [{s['sentiment']}]" if s.get("sentiment") else ""
-        real_lines.append(
-            f"{s['id']}. [{s.get('ticker', '?')}/{s.get('source', '?')}]"
-            f"{sentiment} {url}"
-        )
-    if not real_lines:
-        return briefing
-    real_block = "**Sources:**\n" + "\n".join(real_lines)
-
-    # cut from the FIRST Sources heading onward (writer often emits it twice)
-    lines = briefing.split("\n")
-    cut_idx = None
-    for i, line in enumerate(lines):
-        if _SOURCES_HEADING.match(line.strip()):
-            cut_idx = i
-            break
-    if cut_idx is not None:
-        lines = lines[:cut_idx]
-    cleaned = "\n".join(lines).rstrip()
-    return cleaned + "\n\n" + real_block
-
-
 def write_node(state: State) -> dict:
     """Hand off to the CrewAI crew, then post-process URLs.
 
-    Day 11: the writer cannot be trusted to copy URLs verbatim, so we replace
-    its Sources block with the real URLs from retrieval before saving.
+    The writer cannot be trusted to copy URLs verbatim, so we replace its
+    Sources block with the real URLs from retrieval before saving.
     """
-    crew = build_crew(
-        ticker=state["ticker"],
-        context=state["context"],
-        sources=state["sources"],
-    )
-    # kickoff runs research -> analyst -> critic -> writer in sequence
-    result = crew.kickoff()
-    # CrewAI 0.51 returns a CrewOutput object, get the raw string
-    raw = str(result)
-    cleaned = _replace_sources_block(raw, state.get("sources", []))
-    return {"briefing": cleaned}
+    ticker = state["ticker"]
+    sources = state.get("sources", [])
+    try:
+        crew = build_crew(
+            ticker=ticker,
+            context=state["context"],
+            sources=sources,
+            verbose=os.getenv("AMIA_CREW_VERBOSE", "").strip() == "1",
+        )
+        # kickoff runs research -> analyst -> critic -> writer in sequence
+        result = crew.kickoff()
+        # CrewAI 0.51 returns a CrewOutput object, get the raw string
+        raw = str(result)
+    except Exception as e:
+        warning = f"crew failed: {e.__class__.__name__}: {e}"
+        print(f"[write] {warning}; using deterministic fallback")
+        fallback = build_fallback_briefing(ticker, sources, reason=warning)
+        return {"briefing": fallback, "quality_warnings": [warning]}
+
+    cleaned = replace_sources_block(raw, sources)
+    quality = validate_briefing(cleaned, sources)
+    if not quality.ok:
+        print(f"[write] briefing failed quality gate: {quality.warnings}")
+        fallback = build_fallback_briefing(
+            ticker,
+            sources,
+            reason="; ".join(quality.warnings),
+        )
+        return {"briefing": fallback, "quality_warnings": quality.warnings}
+
+    return {"briefing": cleaned, "quality_warnings": []}
 
 
 def should_retry(state: State) -> str:
@@ -230,17 +191,13 @@ graph.add_edge("write", END)
 app = graph.compile()
 
 
-# tickers AMIA covers, used by run_for_question to detect which ticker to run
-TICKERS = ["AAPL", "TSLA", "NVDA", "MSFT", "AMZN"]
-
-
 def run_for_question(question: str, default_ticker: str = "AAPL") -> dict:
     """Eval-friendly entry point.
 
     The graph itself is ticker-driven (the planner generates its own questions
-    inside the graph). For Day 10 evals we want to feed in a free-form
-    question, still run the full pipeline, and get back both the briefing and
-    the structured sources retrieve_with_sources produced.
+    inside the graph). For evals we feed in a free-form question, still run
+    the full pipeline, and get back both the briefing and the structured
+    sources retrieve_with_sources produced.
 
     Behavior:
         1. Scan the question text for one of the 5 known tickers
@@ -259,7 +216,7 @@ def run_for_question(question: str, default_ticker: str = "AAPL") -> dict:
     detected = next((t for t in TICKERS if t in upper_q), default_ticker)
 
     # local import so eval still works in environments where langfuse is off
-    from tracing import build_config
+    from amia.observability.tracing import build_config
 
     config = build_config(ticker=detected, session_id="amia-eval")
     result = app.invoke(
@@ -273,12 +230,9 @@ def run_for_question(question: str, default_ticker: str = "AAPL") -> dict:
     }
 
 
-if __name__ == "__main__":
+def main() -> None:
     # smoke test on one ticker, full crew runs inside write_node.
-    # Day 9: build_config returns callbacks + Langfuse metadata so this
-    # smoke run shows up grouped in the Langfuse UI. flush at the end so
-    # the trace actually uploads before python exits.
-    from tracing import build_config, flush as flush_tracing
+    from amia.observability.tracing import build_config, flush as flush_tracing
 
     config = build_config(ticker="TSLA")
     result = app.invoke(
@@ -290,3 +244,7 @@ if __name__ == "__main__":
     print("=" * 60)
     print(result["briefing"])
     flush_tracing()
+
+
+if __name__ == "__main__":
+    main()

@@ -1,13 +1,12 @@
-"""Day 12 task 4: per-provider token usage logging.
+"""Per-provider token usage logging.
 
-Writes one JSONL line per LLM call to logs/token_usage.jsonl. Lets you eyeball
-"how close am I to Groq's 100k TPD" without hitting Groq's limits API.
-
-Wired in two places:
+Writes one JSONL line per LLM call to logs/token_usage.jsonl so you can
+eyeball "how close am I to Groq's free-tier TPD" without hitting Groq's
+limits API. Wired in two places:
   1. graph.py planner: explicit log() call inside _invoke_with_fallback
   2. crew.py: litellm.success_callback fires on every CrewAI agent call
 
-Run `python usage_log.py` to print today's totals per provider.
+Run `python -m amia.observability.usage_log` to print today's totals.
 """
 import json
 from datetime import datetime
@@ -69,35 +68,38 @@ def daily_summary(date_str: str | None = None) -> dict:
     if not LOG_PATH.exists():
         return {}
     totals: dict[tuple[str, str], int] = defaultdict(int)
-    for line in LOG_PATH.read_text().splitlines():
-        if not line.strip():
-            continue
-        try:
-            e = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if not e["ts"].startswith(date_str):
-            continue
-        key = (e["provider"], e["model"])
-        totals[key] += e["total_tokens"]
+    with open(LOG_PATH) as f:
+        for line in f:
+            if not line.strip():
+                continue
+            try:
+                e = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if not e["ts"].startswith(date_str):
+                continue
+            key = (e["provider"], e["model"])
+            totals[key] += e["total_tokens"]
     return dict(totals)
 
 
-# free tier daily limits, used for the % bar in the CLI summary.
-# Day 13: model split means we now hit 4 different Groq endpoints. Numbers
-# below reflect Groq free tier as of May 2026; verify on the dashboard if
-# the % bar starts looking off.
+# Groq free-tier daily token limits, keyed without the leading "groq/" so
+# the planner (which logs bare ids) and crew (which logs prefixed ids) both
+# resolve to the same limit. Verify on the Groq dashboard if % bars look off.
 KNOWN_LIMITS = {
-    ("groq", "groq/openai/gpt-oss-120b"): 200_000,
-    ("groq", "openai/gpt-oss-120b"): 200_000,  # planner logs without prefix
-    ("groq", "groq/meta-llama/llama-4-scout-17b-16e-instruct"): 500_000,
-    ("groq", "groq/qwen/qwen3-32b"): 500_000,
-    ("groq", "groq/llama-3.1-8b-instant"): 500_000,
-    ("groq", "llama-3.1-8b-instant"): 500_000,  # subquery logs without prefix
-    # legacy keys kept so historical entries still render with a bar
-    ("groq", "groq/llama-3.3-70b-versatile"): 100_000,
-    # gemini free tier is 1500 req/day, no documented TPD; show usage only
+    ("groq", "openai/gpt-oss-120b"): 200_000,
+    ("groq", "meta-llama/llama-4-scout-17b-16e-instruct"): 500_000,
+    ("groq", "qwen/qwen3-32b"): 500_000,
+    ("groq", "llama-3.1-8b-instant"): 500_000,
+    # Legacy key, kept so historical entries still render with a bar.
+    ("groq", "llama-3.3-70b-versatile"): 100_000,
+    # Gemini free tier is 1500 req/day, no documented TPD; show usage only.
 }
+
+
+def _lookup_limit(provider: str, model: str) -> int | None:
+    bare = model.split("/", 1)[1] if model.startswith(f"{provider}/") else model
+    return KNOWN_LIMITS.get((provider, bare))
 
 
 def print_summary(date_str: str | None = None) -> None:
@@ -109,7 +111,7 @@ def print_summary(date_str: str | None = None) -> None:
     print(f"\nToken usage for {date_str or datetime.now().strftime('%Y-%m-%d')}")
     print("=" * 60)
     for (provider, model), tokens in sorted(totals.items()):
-        limit = KNOWN_LIMITS.get((provider, model))
+        limit = _lookup_limit(provider, model)
         if limit:
             pct = tokens / limit
             bar = "#" * int(pct * 30) + "." * (30 - int(pct * 30))
@@ -118,7 +120,11 @@ def print_summary(date_str: str | None = None) -> None:
             print(f"{model:50} {tokens:>7} tokens (no known limit)")
 
 
-if __name__ == "__main__":
+def main() -> None:
     import sys
     date = sys.argv[1] if len(sys.argv) > 1 else None
     print_summary(date)
+
+
+if __name__ == "__main__":
+    main()

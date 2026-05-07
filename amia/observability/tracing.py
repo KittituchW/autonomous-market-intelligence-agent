@@ -1,4 +1,4 @@
-"""Day 9: Langfuse v3 tracing for the whole pipeline.
+"""Langfuse v3 tracing for the whole pipeline.
 
 We trace 3 layers from one place:
 
@@ -11,12 +11,10 @@ We trace 3 layers from one place:
 3. CrewAI: CrewAI 0.51 uses LiteLLM under the hood. LiteLLM ships a built-in
    Langfuse hook turned on with litellm.success_callback = ["langfuse"].
 
-Why one shared file: rest of the codebase calls `tracing.build_config(ticker)`
-and never has to know which Langfuse SDK version is in use.
-
-v3 vs v2 note: in v2 the CallbackHandler took session_id, tags, metadata as
-constructor args. In v3 those moved to the LangChain run config under
-metadata keys with the `langfuse_` prefix. We hide that detail in build_config.
+The rest of the codebase calls `tracing.build_config(ticker)` and never has
+to know which Langfuse SDK version is in use. v3 moves session_id/tags/user_id
+from CallbackHandler constructor args to LangChain run-config metadata under
+`langfuse_*` keys; build_config hides that detail.
 """
 import os
 from datetime import datetime
@@ -156,7 +154,7 @@ def build_config(
             # v3 honors these specific keys on the run metadata
             "langfuse_session_id": session_id,
             "langfuse_tags": tags,
-            "langfuse_user_id": "top",
+            "langfuse_user_id": os.getenv("LANGFUSE_USER_ID", "amia"),
             # plain extras you might want for filtering
             "ticker": ticker,
             "run_date": run_date,
@@ -180,7 +178,7 @@ def flush():
         print(f"[tracing] flush failed: {e}")
 
 
-if __name__ == "__main__":
+def main() -> None:
     # quick sanity check
     print("Langfuse enabled:", _enabled())
     h = get_handler()
@@ -188,3 +186,7 @@ if __name__ == "__main__":
     cfg = build_config(ticker="TSLA")
     print("Config keys:", list(cfg.keys()))
     print("Metadata:", cfg.get("metadata"))
+
+
+if __name__ == "__main__":
+    main()

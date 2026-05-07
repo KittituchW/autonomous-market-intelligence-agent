@@ -105,23 +105,131 @@ pip install -r requirements.txt
 ollama pull nomic-embed-text
 ollama pull gemma3:4b
 
-# start qdrant
-docker run -d -p 6333:6333 qdrant/qdrant
+# start Qdrant the first time
+docker run -d --name amia-qdrant -p 6333:6333 qdrant/qdrant
 
 # .env needs: GROQ_API_KEY, GEMINI_API_KEY, NEWSAPI_KEY
 cp .env.example .env  # then fill it in
-
-# pull data and build index
-python ingest.py
-python social_ingest.py
-python retrieval.py    # builds Qdrant index
-
-# smoke test on TSLA
-python graph.py
-
-# 5-ticker run
-python run_briefings.py
 ```
+
+## How to use it
+
+Start from the repo root with the virtualenv active:
+
+```bash
+source venv/bin/activate
+```
+
+Make sure the local services are running before you generate briefings:
+
+```bash
+# Qdrant vector store, after the first setup run
+docker start amia-qdrant
+
+# Ollama should already have these models pulled
+ollama pull nomic-embed-text
+ollama pull gemma3:4b
+```
+
+### Full Daily Run
+
+Use this when you want the whole pipeline end-to-end:
+
+```bash
+python -m amia.main
+```
+
+That runs:
+
+1. NewsAPI ingest
+2. StockTwits + HackerNews ingest
+3. Qdrant reindex
+4. Daily briefing generation for AAPL, TSLA, NVDA, MSFT, AMZN
+
+Outputs land in:
+
+```text
+briefings/YYYY-MM-DD/AAPL.md
+briefings/YYYY-MM-DD/TSLA.md
+briefings/YYYY-MM-DD/NVDA.md
+briefings/YYYY-MM-DD/MSFT.md
+briefings/YYYY-MM-DD/AMZN.md
+briefings/YYYY-MM-DD/_run_summary.json
+briefings/YYYY-MM-DD/_orchestrator_summary.json
+```
+
+### Fast Dev Run
+
+Use this when you already have data and an index, and only want to test the briefing pipeline:
+
+```bash
+python -m amia.main --skip-ingest --skip-reindex --strict NVDA
+```
+
+Use any supported ticker:
+
+```bash
+python -m amia.main --skip-ingest --skip-reindex AAPL
+python -m amia.main --skip-ingest --skip-reindex TSLA NVDA
+```
+
+`--strict` makes the command exit non-zero if a ticker fails or if the quality gate emits warnings. This is the mode to use for CI or unattended automation.
+
+### Run Individual Steps
+
+You can run each step directly when debugging:
+
+```bash
+# pull NewsAPI articles
+python -m amia.ingest.news
+
+# pull StockTwits + HackerNews posts
+python -m amia.ingest.social
+
+# rebuild Qdrant from data/news and data/social/filtered
+python -m amia.retrieval.index
+
+# write briefings for all tickers
+python -m amia.pipeline.run_briefings --strict
+
+# write briefings for selected tickers
+python -m amia.pipeline.run_briefings TSLA NVDA --strict
+```
+
+### Useful Diagnostics
+
+```bash
+# verify the Qdrant index has the expected source mix
+python -m amia.retrieval.diagnose
+
+# print today's token usage by provider/model
+python -m amia.observability.usage_log
+
+# run the quality-gate tests
+python -m unittest discover -p 'test*.py'
+```
+
+### n8n / HTTP Mode
+
+Start the local Flask bridge:
+
+```bash
+python -m amia.delivery.pipeline_server
+```
+
+Then n8n can call:
+
+```text
+POST http://host.docker.internal:8000/ingest-news
+POST http://host.docker.internal:8000/ingest-social
+POST http://host.docker.internal:8000/reindex
+POST http://host.docker.internal:8000/run-briefings
+GET  http://host.docker.internal:8000/deliver
+GET  http://host.docker.internal:8000/deliver-html
+GET  http://host.docker.internal:8000/health
+```
+
+Use `/deliver` for structured JSON and `/deliver-html` for a ready-to-send email body.
 
 ## Reliability
 
@@ -130,24 +238,34 @@ A few things make this survive an unattended daily run:
 1. **Groq → Gemini fallback** via `litellm.fallbacks` for the crew, plus a try/except wrapper in the planner. Eval above was partly served by Gemini after Groq capped.
 2. **Writer → Gemini fallback** with three layers: a pre-flight probe of `localhost:11434/api/tags` at module load, a LiteLLM runtime fallback for mid-generation OOM/timeout, and an `AMIA_WRITER=cloud` env var to force cloud mode when you know RAM will be tight. Pipeline still produces a briefing if Ollama is offline or `gemma3:4b` is too heavy that day.
 3. **6-hour disk cache** on `retrieve_with_sources` keyed by `(query, ticker, top_k)`. Skips the Ollama embed and Qdrant query on hits.
-4. **NewsAPI pre-flight counter** in `ingest.py` bails before the call when the day's 100 are spent. Counter resets at UTC midnight.
-5. **Per-provider token usage log** at `logs/token_usage.jsonl`. `python usage_log.py` prints daily totals against known free-tier limits.
+4. **One-command orchestrator** in `amia/main.py`. It runs ingest → social ingest → reindex → briefings, writes `briefings/YYYY-MM-DD/_orchestrator_summary.json`, and exits non-zero on failed steps.
+5. **NewsAPI pre-flight counter** in `amia/ingest/news.py` bails before the call when the day's 100 are spent. Counter resets at UTC midnight.
+6. **Per-provider token usage log** at `logs/token_usage.jsonl`. `python -m amia.observability.usage_log` prints daily totals against known free-tier limits.
+7. **Briefing quality gate** in `amia/quality/briefing_quality.py`. Saved markdown is stripped of reasoning artifacts, checked for required sections, validated for real source IDs, and checked so News/Retail bullets cite the right source type. If the crew fails or the output misses the gate, the graph saves an honest retrieval-backed fallback briefing instead of malformed prose.
+8. **Run manifest** at `briefings/YYYY-MM-DD/_run_summary.json`. The CLI records successes, failures, elapsed time, and quality warnings. `--strict` or `AMIA_STRICT=1` returns non-zero for warnings too.
 
 ## Project structure
 
 ```
-ingest.py            # NewsAPI pull, 100/day pre-flight counter
-social_ingest.py     # StockTwits + HackerNews pull
-retrieval.py         # LlamaIndex + Qdrant, ticker filter, social quota, disk cache
-subquery.py          # SubQuestionQueryEngine for cross-source questions
-graph.py             # LangGraph state machine, planner, fallback, URL post-processing
-crew.py              # 4-agent CrewAI crew with model split + litellm fallback
-tracing.py           # Langfuse callback wiring
-usage_log.py         # per-provider token tracker
-diagnose_index.py    # Qdrant payload audit (catches stale index)
-run_briefings.py     # CLI loop over 5 tickers
-evals/run_eval.py    # 10-question eval, scores retrieval + reasoning
-n8n/                 # workflow exports
+amia/
+  main.py                       # ingest -> social -> reindex -> briefings orchestrator
+  config/                       # model ids, ticker list, shared constants
+  ingest/news.py                # NewsAPI pull, 100/day pre-flight counter
+  ingest/social.py              # StockTwits + HackerNews pull and filtering
+  retrieval/index.py            # LlamaIndex + Qdrant, ticker filter, source quotas, cache
+  retrieval/subquery.py         # SubQuestionQueryEngine for cross-source questions
+  retrieval/diagnose.py         # Qdrant payload audit, catches stale indexes
+  pipeline/graph.py             # LangGraph state machine, planner, fallback, quality gate
+  pipeline/crew.py              # 4-agent CrewAI crew with model split + litellm fallback
+  pipeline/run_briefings.py     # CLI loop over selected tickers
+  quality/briefing_quality.py   # markdown validator, source replacement, deterministic fallback
+  observability/tracing.py      # Langfuse callback wiring
+  observability/usage_log.py    # per-provider token tracker
+  delivery/digest.py            # markdown-to-email/Notion payload helpers
+  delivery/pipeline_server.py   # Flask bridge for n8n
+tests/                          # unit tests
+evals/run_eval.py               # 10-question eval, scores retrieval + reasoning
+n8n/                            # workflow exports
 ```
 
 ## What I'd do next

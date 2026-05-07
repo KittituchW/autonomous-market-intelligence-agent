@@ -1,4 +1,4 @@
-"""Day 8: parse briefings/YYYY-MM-DD/*.md into structured dicts for delivery.
+"""Parse briefings/YYYY-MM-DD/*.md into structured dicts for delivery.
 
 The CrewAI writer produces markdown with a known shape:
 
@@ -10,17 +10,17 @@ The CrewAI writer produces markdown with a known shape:
     **Watch:** ...
     **Sources:** ...
 
-We split that into fields so the email and Notion workflows can render proper
+We split that into fields so email and Notion workflows can render proper
 sections instead of dumping the whole blob. If the writer ever drifts off
-template, we fall back to body=full_markdown so nothing is lost.
+template, body=full_markdown is the safety net.
 """
 import os
 import re
 from datetime import datetime
-from typing import Optional
+
+from amia.config import TICKERS
 
 BRIEFINGS_DIR = "briefings"
-TICKERS = ["AAPL", "TSLA", "NVDA", "MSFT", "AMZN"]
 
 
 def _split_sections(body: str) -> dict:
@@ -76,7 +76,7 @@ def parse_briefing_file(path: str) -> dict:
     }
 
 
-def load_today(run_date: Optional[str] = None) -> dict:
+def load_today(run_date: str | None = None) -> dict:
     """Load all briefings for a given date (default: today). Used by /deliver.
 
     Returns:
@@ -97,8 +97,10 @@ def load_today(run_date: Optional[str] = None) -> dict:
     # iterate in TICKERS order so emails are always AAPL, TSLA, NVDA, MSFT, AMZN
     for ticker in TICKERS:
         path = os.path.join(day_dir, f"{ticker}.md")
-        if os.path.exists(path):
+        try:
             briefings.append(parse_briefing_file(path))
+        except FileNotFoundError:
+            continue
 
     return {
         "date": run_date,
@@ -120,7 +122,7 @@ def build_email_html(payload: dict) -> str:
     if not briefings:
         return f"<p>No briefings found for {date}.</p>"
 
-    # table of contents at the top so Top can jump to a ticker
+    # table of contents at the top for quick jump to a ticker
     toc = " &nbsp;|&nbsp; ".join(
         f'<a href="#{b["ticker"]}" style="color:#0a66c2;text-decoration:none;">{b["ticker"]}</a>'
         for b in briefings
@@ -154,7 +156,7 @@ def build_email_html(payload: dict) -> str:
     return html
 
 
-if __name__ == "__main__":
+def main() -> None:
     # quick CLI: python digest.py [YYYY-MM-DD]
     import sys
     import json
@@ -163,3 +165,7 @@ if __name__ == "__main__":
     payload = load_today(date_arg)
     print(json.dumps(payload, indent=2)[:2000])
     print(f"\n--- {payload['count']} briefings loaded ---")
+
+
+if __name__ == "__main__":
+    main()

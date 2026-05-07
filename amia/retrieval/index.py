@@ -2,7 +2,6 @@ import os
 import json
 import time
 import hashlib
-import pickle
 from pathlib import Path
 from dotenv import load_dotenv
 from llama_index.core import VectorStoreIndex, Document, Settings, StorageContext
@@ -14,10 +13,9 @@ from qdrant_client.models import Distance, VectorParams
 
 load_dotenv()
 
-# Day 12 task 1: disk cache for retrieve_with_sources.
-# News doesn't move that fast intraday, and dev iteration runs the same
-# (ticker, plan) query repeatedly. Skip the Ollama embed + Qdrant query
-# on cache hit. 6h TTL means the daily ingest still gets fresh retrieval.
+# Disk cache for retrieve_with_sources. News doesn't move that fast intraday,
+# and dev iteration runs the same (ticker, plan) query repeatedly. 6h TTL
+# means the daily ingest still gets fresh retrieval.
 _CACHE_DIR = Path("cache/retrieve")
 _CACHE_TTL_SECONDS = 60 * 60 * 6
 
@@ -25,29 +23,30 @@ _CACHE_TTL_SECONDS = 60 * 60 * 6
 def _cache_key(query: str, ticker: str | None, top_k: int, social_quota: int) -> Path:
     raw = f"{query}|{ticker}|{top_k}|{social_quota}".encode()
     digest = hashlib.sha256(raw).hexdigest()[:16]
-    return _CACHE_DIR / f"{digest}.pkl"
+    return _CACHE_DIR / f"{digest}.json"
 
 
 def _cache_get(path: Path):
-    if not path.exists():
+    try:
+        age = time.time() - path.stat().st_mtime
+    except FileNotFoundError:
         return None
-    age = time.time() - path.stat().st_mtime
     if age > _CACHE_TTL_SECONDS:
         return None
     try:
-        with open(path, "rb") as f:
-            return pickle.load(f)
-    except Exception:
-        # corrupt cache file, ignore and re-compute
+        with open(path) as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError):
         return None
+    return data["formatted"], data["sources"]
 
 
-def _cache_put(path: Path, value) -> None:
+def _cache_put(path: Path, formatted: str, sources: list[dict]) -> None:
     try:
         _CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        with open(path, "wb") as f:
-            pickle.dump(value, f)
-    except Exception:
+        with open(path, "w") as f:
+            json.dump({"formatted": formatted, "sources": sources}, f)
+    except OSError:
         # cache write failures must not break retrieval
         pass
 
@@ -176,9 +175,9 @@ def retrieve_with_sources(
 ) -> tuple[str, list[dict]]:
     """Like search_news but also returns a structured list of sources for citations.
 
-    Day 11 fix: hard filter by ticker, blend in StockTwits + HackerNews quotas
-    so cross-source briefings have real retail signal, dedupe by URL to kill
-    the same-article-three-times problem the Day 9 trace showed.
+    Hard filters by ticker, blends in StockTwits + HackerNews quotas so
+    cross-source briefings have real retail signal, dedupes by URL to kill
+    same-article-three-times duplicates.
 
     Args:
         query:        embedding query string
@@ -193,7 +192,6 @@ def retrieve_with_sources(
         sources:   list of dicts with ticker, source, url, sentiment, data_type
                    so the writer agent can cite them by index
     """
-    # Day 12: cache hit short-circuits the embed + Qdrant query
     cache_path = _cache_key(query, ticker, top_k, social_quota)
     cached = _cache_get(cache_path)
     if cached is not None:
@@ -211,32 +209,20 @@ def retrieve_with_sources(
     main_nodes = main_retriever.retrieve(query)
 
     # 2. force StockTwits + HackerNews to surface, otherwise vector similarity
-    # picks news every time and cross-source questions die. Eval q6/q8/q10
-    # showed 0/5 StockTwits hits before this fix.
-    stocktwits_nodes: list = []
-    hackernews_nodes: list = []
+    # picks news every time and cross-source questions return 0 social hits.
+    social_nodes: list = []
     if ticker and social_quota > 0:
-        st_filter = MetadataFilters(filters=[
-            MetadataFilter(key="ticker", value=ticker),
-            MetadataFilter(key="source", value="stocktwits"),
-        ])
-        st_retriever = index.as_retriever(
-            similarity_top_k=social_quota, filters=st_filter
-        )
-        stocktwits_nodes = st_retriever.retrieve(query)
+        for source in ("stocktwits", "hackernews"):
+            filters = MetadataFilters(filters=[
+                MetadataFilter(key="ticker", value=ticker),
+                MetadataFilter(key="source", value=source),
+            ])
+            retriever = index.as_retriever(similarity_top_k=social_quota, filters=filters)
+            social_nodes.extend(retriever.retrieve(query))
 
-        hn_filter = MetadataFilters(filters=[
-            MetadataFilter(key="ticker", value=ticker),
-            MetadataFilter(key="source", value="hackernews"),
-        ])
-        hn_retriever = index.as_retriever(
-            similarity_top_k=social_quota, filters=hn_filter
-        )
-        hackernews_nodes = hn_retriever.retrieve(query)
-
-    # 3. combine and dedupe by URL. Day 9 trace showed the same Barchart article
-    # appearing 3 times under different ticker tags. URL is the right key.
-    all_nodes = main_nodes + stocktwits_nodes + hackernews_nodes
+    # 3. combine and dedupe by URL; the same article can be tagged under
+    # multiple tickers and would otherwise appear several times.
+    all_nodes = main_nodes + social_nodes
     seen: set[str] = set()
     deduped = []
     for n in all_nodes:
@@ -262,9 +248,9 @@ def retrieve_with_sources(
             "snippet": node.text[:200],
         })
 
-    result = (_format_nodes(deduped), sources)
-    _cache_put(cache_path, result)
-    return result
+    formatted = _format_nodes(deduped)
+    _cache_put(cache_path, formatted, sources)
+    return formatted, sources
 
 
 def summarise_ticker(ticker: str, top_k: int = 5) -> str:
@@ -278,9 +264,8 @@ def summarise_ticker(ticker: str, top_k: int = 5) -> str:
     return _format_nodes(nodes)
 
 
-# --- Day 4 filter helpers ---
-# These let agents ask for one source type only, useful for the sub-question
-# query engine on Day 5 and for comparing news vs social signals.
+# Filter helpers: let agents ask for one source type only, used by the
+# sub-question query engine and for comparing news vs social signals.
 
 def _filtered_search(query: str, filters: MetadataFilters, top_k: int) -> str:
     """Generic filtered search, used by the helpers below."""
@@ -313,6 +298,9 @@ def search_stocktwits_only(query: str, top_k: int = 5) -> str:
     filters = MetadataFilters(filters=[MetadataFilter(key="source", value="stocktwits")])
     return _filtered_search(query, filters, top_k)
 
-if __name__ == "__main__":
+def main() -> None:
     build_index()
-    
+
+
+if __name__ == "__main__":
+    main()

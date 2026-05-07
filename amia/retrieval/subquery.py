@@ -1,7 +1,8 @@
-"""Day 5: SubQuestionQueryEngine over the same Qdrant index, but with two filtered sub-engines.
+"""SubQuestionQueryEngine over the Qdrant index with two filtered sub-engines.
 
-The engine decomposes a hard question into sub-questions, routes each one to either the
-news engine or the social engine (whichever is more relevant), then synthesises one answer.
+The engine decomposes a hard question into sub-questions, routes each one to
+either the news engine or the social engine (whichever is more relevant),
+then synthesises one answer.
 """
 import os
 from dotenv import load_dotenv
@@ -9,18 +10,15 @@ from llama_index.core.query_engine import SubQuestionQueryEngine
 from llama_index.core.tools import QueryEngineTool, ToolMetadata
 from llama_index.core.vector_stores import MetadataFilter, MetadataFilters
 from llama_index.llms.groq import Groq
-from retrieval import get_index
-from models import RETRIEVE_MODEL_BARE
+from amia.retrieval.index import get_index
+from amia.config.models import RETRIEVE_MODEL_BARE
 
 load_dotenv()
 
-# Decomposition + synthesis LLM. We pass it explicitly so we do not touch the
-# global Settings.llm and conflict with retrieval.py.
-# Day 13: dropped from llama-3.3-70b-versatile to llama-3.1-8b-instant.
-# This engine is called as a TOOL from the Researcher agent (which already
-# runs on Llama 4 Scout). Stacking 70B inside a Scout call is wasteful;
-# 8B Instant gives us low-latency decomposition and the Researcher does the
-# real synthesis with the structured sources anyway.
+# Decomposition + synthesis LLM. Passed explicitly so we don't touch
+# Settings.llm and conflict with the index module. Kept on a small model
+# because this engine is called as a tool from the Researcher (Llama 4 Scout),
+# which does the real synthesis itself.
 groq_llm = Groq(
     model=RETRIEVE_MODEL_BARE,
     api_key=os.getenv("GROQ_API_KEY"),
@@ -109,7 +107,7 @@ def compare_news_and_social(question: str) -> str:
     return ask(question)
 
 
-if __name__ == "__main__":
+def main() -> None:
     # 3 test questions per Day 5 plan
     test_questions = [
         "Compare StockTwits sentiment vs news sentiment on TSLA over the last week.",
@@ -121,3 +119,7 @@ if __name__ == "__main__":
         print(f"Q: {q}")
         print("=" * 70)
         print(ask(q))
+
+
+if __name__ == "__main__":
+    main()

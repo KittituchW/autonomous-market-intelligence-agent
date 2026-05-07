@@ -4,12 +4,12 @@ import os
 import re
 import time
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 
 import requests
 
-
-TICKERS = ["AAPL", "TSLA", "NVDA", "MSFT", "AMZN"]
+from amia.config import TICKERS
 
 RAW_DIR = "data/social/raw"
 FILTERED_DIR = "data/social/filtered"
@@ -370,35 +370,37 @@ def process_stocktwits(ticker: str, raw_messages: list[dict]) -> tuple[list[dict
     return raw_posts, filtered_posts
 
 
+def _fetch_hn_query(ticker: str, query: str, cutoff_epoch: int) -> list[dict]:
+    endpoint = "https://hn.algolia.com/api/v1/search_by_date"
+    params = {
+        "query": query,
+        "tags": "story",
+        "hitsPerPage": 20,
+        "numericFilters": f"created_at_i>{cutoff_epoch}",
+    }
+    try:
+        resp = requests.get(endpoint, params=params, timeout=10)
+    except requests.RequestException as e:
+        print(f"HackerNews {ticker} query '{query}' failed: {e}")
+        return []
+    if resp.status_code != 200:
+        print(f"HackerNews {ticker} query '{query}' failed: HTTP {resp.status_code}")
+        return []
+    hits = resp.json().get("hits", [])
+    for hit in hits:
+        hit["query_used"] = query
+    return hits
+
+
 def fetch_hackernews_raw(ticker: str) -> list[dict]:
     """Pull recent HN stories using ticker-specific product/company queries."""
-    endpoint = "https://hn.algolia.com/api/v1/search_by_date"
     cutoff = datetime.now(timezone.utc) - timedelta(days=HACKERNEWS_DAYS)
     cutoff_epoch = int(cutoff.timestamp())
-    raw_hits = []
-
-    for query in HN_QUERIES[ticker]:
-        params = {
-            "query": query,
-            "tags": "story",
-            "hitsPerPage": 20,
-            "numericFilters": f"created_at_i>{cutoff_epoch}",
-        }
-
-        try:
-            resp = requests.get(endpoint, params=params, timeout=10)
-        except requests.RequestException as e:
-            print(f"HackerNews {ticker} query '{query}' failed: {e}")
-            continue
-
-        if resp.status_code != 200:
-            print(f"HackerNews {ticker} query '{query}' failed: HTTP {resp.status_code}")
-            continue
-
-        for hit in resp.json().get("hits", []):
-            hit["query_used"] = query
-            raw_hits.append(hit)
-
+    queries = HN_QUERIES[ticker]
+    raw_hits: list[dict] = []
+    with ThreadPoolExecutor(max_workers=len(queries)) as pool:
+        for hits in pool.map(lambda q: _fetch_hn_query(ticker, q, cutoff_epoch), queries):
+            raw_hits.extend(hits)
     return raw_hits
 
 
@@ -452,7 +454,7 @@ def top_rejection_reasons(posts: list[dict]) -> str:
     return ", ".join(f"{reason}={count}" for reason, count in counter.most_common(3))
 
 
-if __name__ == "__main__":
+def main() -> None:
     total_usable = 0
 
     for ticker in TICKERS:
@@ -478,3 +480,7 @@ if __name__ == "__main__":
         print(f"  HackerNews top rejection reasons: {top_rejection_reasons(hackernews_posts)}")
 
     print(f"\nTotal usable social docs saved: {total_usable}")
+
+
+if __name__ == "__main__":
+    main()
